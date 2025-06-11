@@ -1,41 +1,53 @@
 
-import React, { useState } from 'react';
+import React, { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import { Languages, Sparkles, Download } from 'lucide-react';
+import { Languages, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import FileUpload from '@/components/FileUpload';
+import FileStats from '@/components/FileStats';
 import SettingsPanel from '@/components/SettingsPanel';
 import TranslationProgress from '@/components/TranslationProgress';
-import { AssParser, type AssLine } from '@/utils/assParser';
-import { GeminiTranslator, type TranslationSettings } from '@/utils/translator';
+import { AssParser } from '@/utils/assParser';
+import { GeminiTranslator } from '@/utils/translator';
+import { useTranslationState, useSettingsState } from '@/hooks/useTranslationState';
 
 const Index = () => {
   const { toast } = useToast();
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isTranslating, setIsTranslating] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [translatedContent, setTranslatedContent] = useState<string>('');
-  const [error, setError] = useState<string | null>(null);
+  const {
+    selectedFile,
+    isTranslating,
+    translatedContent,
+    error,
+    status,
+    statusMessage,
+    dialogueCount,
+    updateState,
+    resetTranslation,
+    setSelectedFile
+  } = useTranslationState();
 
-  // Settings state
-  const [apiKey, setApiKey] = useState('');
-  const [temperature, setTemperature] = useState(0.7);
-  const [topP, setTopP] = useState(0.9);
-  const [topK, setTopK] = useState(40);
-  const [usePersonalApi, setUsePersonalApi] = useState(false);
-  const [baseDelay, setBaseDelay] = useState(1000);
-  const [quotaDelay, setQuotaDelay] = useState(10000);
-  const [numberOfChunks, setNumberOfChunks] = useState(5);
-  const [geminiModel, setGeminiModel] = useState('gemini-2.0-flash-exp');
+  const {
+    settings,
+    updateSettings,
+    applyPreset
+  } = useSettingsState();
+
+  // Calculate dialogue count when file is selected
+  useEffect(() => {
+    if (selectedFile) {
+      selectedFile.text().then(content => {
+        const parsedLines = AssParser.parseAssFile(content);
+        const dialogues = parsedLines.filter(line => 
+          line.type === 'dialogue' && line.text && line.text.trim()
+        );
+        updateState({ dialogueCount: dialogues.length });
+      }).catch(console.error);
+    }
+  }, [selectedFile, updateState]);
 
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
-    setTranslatedContent('');
-    setError(null);
-    setProgress(0);
-    
     toast({
       title: "فایل انتخاب شد",
       description: `${file.name} آماده ترجمه است`,
@@ -44,9 +56,7 @@ const Index = () => {
 
   const handleRemoveFile = () => {
     setSelectedFile(null);
-    setTranslatedContent('');
-    setError(null);
-    setProgress(0);
+    updateState({ dialogueCount: 0 });
   };
 
   const handleTranslate = async () => {
@@ -59,7 +69,7 @@ const Index = () => {
       return;
     }
 
-    if (usePersonalApi && !apiKey.trim()) {
+    if (settings.usePersonalApi && !settings.apiKey.trim()) {
       toast({
         title: "خطا", 
         description: "لطفاً کلید API خود را وارد کنید",
@@ -68,22 +78,27 @@ const Index = () => {
       return;
     }
 
-    setIsTranslating(true);
-    setError(null);
-    setProgress(0);
+    updateState({ 
+      isTranslating: true, 
+      error: null,
+      status: {
+        isTranslating: true,
+        progress: 0,
+        currentChunk: 0,
+        totalChunks: 0,
+        translatedCount: 0,
+        totalTexts: 0
+      }
+    });
 
     try {
-      // Read file content
       const fileContent = await selectedFile.text();
-      
-      // Parse ASS file
       const parsedLines = AssParser.parseAssFile(fileContent);
       
-      // Extract unique dialogue texts
       const dialogueTexts = parsedLines
         .filter(line => line.type === 'dialogue' && line.text && line.text.trim())
         .map(line => line.text!)
-        .filter((text, index, array) => array.indexOf(text) === index); // Remove duplicates
+        .filter((text, index, array) => array.indexOf(text) === index);
 
       if (dialogueTexts.length === 0) {
         throw new Error('هیچ متن قابل ترجمه‌ای در فایل یافت نشد');
@@ -94,29 +109,31 @@ const Index = () => {
         description: `${dialogueTexts.length} خط متن برای ترجمه یافت شد`,
       });
 
-      // Translate texts
-      const settings: TranslationSettings = {
-        temperature,
-        topP,
-        topK,
-        apiKey: usePersonalApi ? apiKey : undefined,
-        baseDelay,
-        quotaDelay,
-        numberOfChunks,
-        geminiModel,
+      const translationSettings = {
+        temperature: settings.temperature,
+        topP: settings.topP,
+        topK: settings.topK,
+        apiKey: settings.usePersonalApi ? settings.apiKey : undefined,
+        baseDelay: settings.baseDelay,
+        quotaDelay: settings.quotaDelay,
+        numberOfChunks: settings.numberOfChunks,
+        geminiModel: settings.geminiModel,
+        maxRetries: settings.maxRetries
       };
 
       const translations = await GeminiTranslator.translateTexts(
         dialogueTexts,
-        settings,
-        setProgress
+        translationSettings,
+        (newStatus) => updateState({ status: newStatus }),
+        (message) => updateState({ statusMessage: message })
       );
 
-      // Reconstruct ASS file
       const translatedAssContent = AssParser.reconstructAssFile(parsedLines, translations);
       
-      setTranslatedContent(translatedAssContent);
-      setProgress(100);
+      updateState({
+        translatedContent: translatedAssContent,
+        status: { ...status, progress: 100 }
+      });
 
       toast({
         title: "ترجمه تکمیل شد",
@@ -125,7 +142,7 @@ const Index = () => {
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'خطای نامشخص در ترجمه';
-      setError(errorMessage);
+      updateState({ error: errorMessage });
       
       toast({
         title: "خطا در ترجمه",
@@ -133,8 +150,20 @@ const Index = () => {
         variant: "destructive",
       });
     } finally {
-      setIsTranslating(false);
+      updateState({ isTranslating: false });
     }
+  };
+
+  const handleCancelTranslation = () => {
+    GeminiTranslator.cancelTranslation();
+    updateState({ 
+      isTranslating: false,
+      statusMessage: 'ترجمه توسط کاربر متوقف شد'
+    });
+    toast({
+      title: "ترجمه متوقف شد",
+      description: "ترجمه توسط کاربر لغو شد",
+    });
   };
 
   const handleDownload = () => {
@@ -195,25 +224,22 @@ const Index = () => {
               </CardContent>
             </Card>
 
+            {/* File Statistics */}
+            <FileStats 
+              selectedFile={selectedFile}
+              dialogueCount={dialogueCount}
+              estimatedTime={Math.ceil(dialogueCount / 10)} // Rough estimate
+            />
+
             {/* Translation Button */}
-            {selectedFile && (
+            {selectedFile && !isTranslating && (
               <div className="animate-slide-up">
                 <Button
                   onClick={handleTranslate}
-                  disabled={isTranslating}
                   className="w-full h-14 text-lg bg-primary hover:bg-primary/90 text-primary-foreground hover-glow transition-all duration-300"
                 >
-                  {isTranslating ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin mr-2" />
-                      در حال ترجمه...
-                    </>
-                  ) : (
-                    <>
-                      <Languages className="w-5 h-5 mr-2" />
-                      شروع ترجمه به فارسی
-                    </>
-                  )}
+                  <Languages className="w-5 h-5 mr-2" />
+                  شروع ترجمه به فارسی
                 </Button>
               </div>
             )}
@@ -221,10 +247,12 @@ const Index = () => {
             {/* Translation Progress */}
             <TranslationProgress
               isTranslating={isTranslating}
-              progress={progress}
+              status={status}
               translatedText={translatedContent}
               error={error}
+              statusMessage={statusMessage}
               onDownload={handleDownload}
+              onCancel={handleCancelTranslation}
               originalFileName={selectedFile?.name || ''}
             />
           </div>
@@ -232,64 +260,59 @@ const Index = () => {
           {/* Settings Panel */}
           <div className="space-y-6">
             <SettingsPanel
-              apiKey={apiKey}
-              setApiKey={setApiKey}
-              temperature={temperature}
-              setTemperature={setTemperature}
-              topP={topP}
-              setTopP={setTopP}
-              topK={topK}
-              setTopK={setTopK}
-              usePersonalApi={usePersonalApi}
-              setUsePersonalApi={setUsePersonalApi}
-              baseDelay={baseDelay}
-              setBaseDelay={setBaseDelay}
-              quotaDelay={quotaDelay}
-              setQuotaDelay={setQuotaDelay}
-              numberOfChunks={numberOfChunks}
-              setNumberOfChunks={setNumberOfChunks}
-              geminiModel={geminiModel}
-              setGeminiModel={setGeminiModel}
+              apiKey={settings.apiKey}
+              setApiKey={(key) => updateSettings({ apiKey: key })}
+              temperature={settings.temperature}
+              setTemperature={(temp) => updateSettings({ temperature: temp })}
+              topP={settings.topP}
+              setTopP={(topP) => updateSettings({ topP })}
+              topK={settings.topK}
+              setTopK={(topK) => updateSettings({ topK })}
+              usePersonalApi={settings.usePersonalApi}
+              setUsePersonalApi={(use) => updateSettings({ usePersonalApi: use })}
+              baseDelay={settings.baseDelay}
+              setBaseDelay={(delay) => updateSettings({ baseDelay: delay })}
+              quotaDelay={settings.quotaDelay}
+              setQuotaDelay={(delay) => updateSettings({ quotaDelay: delay })}
+              numberOfChunks={settings.numberOfChunks}
+              setNumberOfChunks={(chunks) => updateSettings({ numberOfChunks: chunks })}
+              geminiModel={settings.geminiModel}
+              setGeminiModel={(model) => updateSettings({ geminiModel: model })}
+              maxRetries={settings.maxRetries}
+              setMaxRetries={(retries) => updateSettings({ maxRetries: retries })}
+              onApplyPreset={applyPreset}
             />
 
             {/* Features Card */}
             <Card className="glass-effect hover-glow animate-fade-in">
               <CardHeader>
-                <CardTitle className="text-foreground">ویژگی‌های سایت</CardTitle>
+                <CardTitle className="text-foreground">ویژگی‌های جدید</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span>پشتیبانی کامل از فرمت ASS</span>
+                    <span>سیستم retry هوشمند</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span>حفظ تگ‌های درون خطی</span>
+                    <span>نمایش پیشرفت دقیق</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span>ترجمه فقط بخش TEXT</span>
+                    <span>امکان توقف ترجمه</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span>پردازش هوشمند تگ‌ها</span>
+                    <span>تنظیمات پیش‌فرض</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span>API شخصی اختیاری</span>
+                    <span>آمار فایل</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span>تنظیمات پیشرفته AI</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span>کنترل تاخیر و تقسیم‌بندی</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span>انتخاب مدل Gemini</span>
+                    <span>تخمین زمان</span>
                   </div>
                 </div>
               </CardContent>

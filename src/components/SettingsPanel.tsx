@@ -6,7 +6,9 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Settings } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Settings, Zap, Balance, Sparkles2 } from 'lucide-react';
+import { TRANSLATION_PRESETS } from '@/hooks/useTranslationState';
 
 interface SettingsPanelProps {
   apiKey: string;
@@ -27,6 +29,9 @@ interface SettingsPanelProps {
   setNumberOfChunks: (chunks: number) => void;
   geminiModel: string;
   setGeminiModel: (model: string) => void;
+  maxRetries?: number;
+  setMaxRetries?: (retries: number) => void;
+  onApplyPreset: (presetName: keyof typeof TRANSLATION_PRESETS) => void;
 }
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
@@ -48,12 +53,21 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   setNumberOfChunks,
   geminiModel,
   setGeminiModel,
+  maxRetries = 3,
+  setMaxRetries,
+  onApplyPreset,
 }) => {
   const geminiModels = [
     { value: 'gemini-2.0-flash-exp', label: 'Gemini 2 Flash (پیشفرض)' },
     { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
     { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
     { value: 'gemini-pro', label: 'Gemini Pro' },
+  ];
+
+  const presetButtons = [
+    { key: 'fast' as const, label: 'سریع', icon: Zap, color: 'text-yellow-500' },
+    { key: 'balanced' as const, label: 'متعادل', icon: Balance, color: 'text-blue-500' },
+    { key: 'quality' as const, label: 'با کیفیت', icon: Sparkles2, color: 'text-purple-500' },
   ];
 
   return (
@@ -65,6 +79,26 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Presets */}
+        <div className="space-y-3">
+          <Label className="text-foreground">تنظیمات پیش‌فرض</Label>
+          <div className="grid grid-cols-3 gap-2">
+            {presetButtons.map(({ key, label, icon: Icon, color }) => (
+              <Button
+                key={key}
+                variant="outline"
+                size="sm"
+                onClick={() => onApplyPreset(key)}
+                className="flex flex-col items-center gap-1 h-auto py-2 hover-glow"
+              >
+                <Icon className={`w-4 h-4 ${color}`} />
+                <span className="text-xs">{label}</span>
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* API Settings */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <Label htmlFor="personal-api" className="text-foreground">
@@ -95,6 +129,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           )}
         </div>
 
+        {/* Model and Core Settings */}
         <div className="space-y-4">
           <div className="space-y-2">
             <Label className="text-foreground">انتخاب مدل Gemini</Label>
@@ -112,6 +147,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </Select>
           </div>
 
+          {/* AI Parameters */}
           <div className="space-y-2">
             <Label className="text-foreground flex justify-between">
               <span>Temperature</span>
@@ -125,9 +161,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               step={0.1}
               className="w-full"
             />
-            <p className="text-xs text-muted-foreground">
-              میزان خلاقیت در ترجمه (0 = محافظه‌کار، 2 = خلاق)
-            </p>
           </div>
 
           <div className="space-y-2">
@@ -143,9 +176,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               step={0.05}
               className="w-full"
             />
-            <p className="text-xs text-muted-foreground">
-              احتمال انتخاب کلمات (0.1 = محدود، 1 = متنوع)
-            </p>
           </div>
 
           <div className="space-y-2">
@@ -161,9 +191,22 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               step={1}
               className="w-full"
             />
-            <p className="text-xs text-muted-foreground">
-              تعداد گزینه‌های کلمات (1 = یکسان، 100 = متنوع)
-            </p>
+          </div>
+
+          {/* Processing Settings */}
+          <div className="space-y-2">
+            <Label className="text-foreground flex justify-between">
+              <span>Number of Chunks</span>
+              <span className="text-primary font-mono">{numberOfChunks}</span>
+            </Label>
+            <Slider
+              value={[numberOfChunks]}
+              onValueChange={(value) => setNumberOfChunks(value[0])}
+              max={20}
+              min={1}
+              step={1}
+              className="w-full"
+            />
           </div>
 
           <div className="space-y-2">
@@ -179,9 +222,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               step={100}
               className="w-full"
             />
-            <p className="text-xs text-muted-foreground">
-              تاخیر پایه بین درخواست‌های API (میلی‌ثانیه)
-            </p>
           </div>
 
           <div className="space-y-2">
@@ -197,28 +237,24 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               step={1000}
               className="w-full"
             />
-            <p className="text-xs text-muted-foreground">
-              تاخیر هنگام رسیدن به محدودیت API (میلی‌ثانیه)
-            </p>
           </div>
 
-          <div className="space-y-2">
-            <Label className="text-foreground flex justify-between">
-              <span>Number of Chunks</span>
-              <span className="text-primary font-mono">{numberOfChunks}</span>
-            </Label>
-            <Slider
-              value={[numberOfChunks]}
-              onValueChange={(value) => setNumberOfChunks(value[0])}
-              max={20}
-              min={1}
-              step={1}
-              className="w-full"
-            />
-            <p className="text-xs text-muted-foreground">
-              تعداد بخش‌های تقسیم فایل برای ترجمه (1 = یکجا، 20 = بخش‌های کوچک)
-            </p>
-          </div>
+          {setMaxRetries && (
+            <div className="space-y-2">
+              <Label className="text-foreground flex justify-between">
+                <span>Max Retries</span>
+                <span className="text-primary font-mono">{maxRetries}</span>
+              </Label>
+              <Slider
+                value={[maxRetries]}
+                onValueChange={(value) => setMaxRetries(value[0])}
+                max={10}
+                min={1}
+                step={1}
+                className="w-full"
+              />
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

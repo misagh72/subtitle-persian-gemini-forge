@@ -7,72 +7,135 @@ export interface TranslationSettings {
   quotaDelay: number;
   numberOfChunks: number;
   geminiModel: string;
+  maxRetries?: number;
+}
+
+export interface TranslationStatus {
+  isTranslating: boolean;
+  progress: number;
+  currentChunk: number;
+  totalChunks: number;
+  translatedCount: number;
+  totalTexts: number;
+  estimatedTimeRemaining?: number;
 }
 
 export class GeminiTranslator {
   private static readonly DEFAULT_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
+  private static abortController: AbortController | null = null;
   
   static async translateTexts(
     texts: string[], 
     settings: TranslationSettings,
-    onProgress?: (progress: number) => void
+    onProgress?: (status: TranslationStatus) => void,
+    onStatusUpdate?: (message: string) => void
   ): Promise<Map<string, string>> {
+    // Create new abort controller for this translation
+    this.abortController = new AbortController();
+    
     const translations = new Map<string, string>();
     const totalTexts = texts.length;
-    
-    // Calculate chunk size based on numberOfChunks setting
     const chunkSize = Math.ceil(totalTexts / settings.numberOfChunks);
+    const maxRetries = settings.maxRetries || 3;
+    const startTime = Date.now();
+    
+    onStatusUpdate?.('شروع ترجمه...');
     
     for (let i = 0; i < totalTexts; i += chunkSize) {
-      const batch = texts.slice(i, Math.min(i + chunkSize, totalTexts));
+      // Check if translation was cancelled
+      if (this.abortController.signal.aborted) {
+        throw new Error('ترجمه توسط کاربر متوقف شد');
+      }
       
-      try {
-        const batchTranslations = await this.translateBatch(batch, settings);
-        
-        batch.forEach((text, index) => {
-          if (batchTranslations[index]) {
-            translations.set(text, batchTranslations[index]);
-          }
-        });
-        
-        const progress = Math.min(((i + chunkSize) / totalTexts) * 100, 100);
-        onProgress?.(Math.round(progress));
-        
-        // Apply base delay between batches
-        if (i + chunkSize < totalTexts) {
-          await new Promise(resolve => setTimeout(resolve, settings.baseDelay));
-        }
-      } catch (error) {
-        console.error('Translation batch failed:', error);
-        
-        // Check if it's a quota/rate limit error and apply quota delay
-        if (error instanceof Error && (
-          error.message.includes('quota') || 
-          error.message.includes('rate') ||
-          error.message.includes('429')
-        )) {
-          console.log(`Quota limit hit, waiting ${settings.quotaDelay}ms...`);
-          await new Promise(resolve => setTimeout(resolve, settings.quotaDelay));
+      const batch = texts.slice(i, Math.min(i + chunkSize, totalTexts));
+      const currentChunk = Math.floor(i / chunkSize) + 1;
+      const totalChunks = Math.ceil(totalTexts / chunkSize);
+      
+      onStatusUpdate?.(`ترجمه بخش ${currentChunk} از ${totalChunks}...`);
+      
+      let retryCount = 0;
+      let batchSuccess = false;
+      
+      while (retryCount <= maxRetries && !batchSuccess && !this.abortController.signal.aborted) {
+        try {
+          const batchTranslations = await this.translateBatch(
+            batch, 
+            settings, 
+            this.abortController.signal
+          );
           
-          // Retry the batch after quota delay
-          try {
-            const retryTranslations = await this.translateBatch(batch, settings);
-            batch.forEach((text, index) => {
-              if (retryTranslations[index]) {
-                translations.set(text, retryTranslations[index]);
-              }
-            });
-          } catch (retryError) {
-            console.error('Retry after quota delay also failed:', retryError);
+          batch.forEach((text, index) => {
+            if (batchTranslations[index]) {
+              translations.set(text, batchTranslations[index]);
+            }
+          });
+          
+          batchSuccess = true;
+          
+          const progress = Math.min(((i + chunkSize) / totalTexts) * 100, 100);
+          const elapsedTime = Date.now() - startTime;
+          const estimatedTotal = (elapsedTime / progress) * 100;
+          const estimatedTimeRemaining = Math.max(0, estimatedTotal - elapsedTime);
+          
+          onProgress?.({
+            isTranslating: true,
+            progress: Math.round(progress),
+            currentChunk,
+            totalChunks,
+            translatedCount: translations.size,
+            totalTexts,
+            estimatedTimeRemaining
+          });
+          
+        } catch (error) {
+          retryCount++;
+          
+          if (this.abortController.signal.aborted) {
+            throw new Error('ترجمه توسط کاربر متوقف شد');
+          }
+          
+          console.error(`خطا در ترجمه بخش ${currentChunk}, تلاش ${retryCount}:`, error);
+          
+          const isQuotaError = error instanceof Error && (
+            error.message.includes('quota') || 
+            error.message.includes('rate') ||
+            error.message.includes('429')
+          );
+          
+          if (isQuotaError && retryCount <= maxRetries) {
+            onStatusUpdate?.(`محدودیت API رسید، انتظار ${settings.quotaDelay / 1000} ثانیه...`);
+            await new Promise(resolve => setTimeout(resolve, settings.quotaDelay));
+          } else if (retryCount <= maxRetries) {
+            onStatusUpdate?.(`تلاش مجدد ${retryCount} از ${maxRetries}...`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          } else {
+            onStatusUpdate?.(`خطا در ترجمه بخش ${currentChunk}: ${error instanceof Error ? error.message : 'خطای نامشخص'}`);
+            // Continue with next batch instead of failing completely
+            break;
           }
         }
+      }
+      
+      // Apply base delay between successful batches
+      if (batchSuccess && i + chunkSize < totalTexts && !this.abortController.signal.aborted) {
+        await new Promise(resolve => setTimeout(resolve, settings.baseDelay));
       }
     }
     
     return translations;
   }
 
-  private static async translateBatch(texts: string[], settings: TranslationSettings): Promise<string[]> {
+  static cancelTranslation() {
+    if (this.abortController) {
+      this.abortController.abort();
+    }
+  }
+
+  private static async translateBatch(
+    texts: string[], 
+    settings: TranslationSettings,
+    signal: AbortSignal
+  ): Promise<string[]> {
     const prompt = this.createTranslationPrompt(texts);
     
     const requestBody = {
@@ -94,16 +157,18 @@ export class GeminiTranslator {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(requestBody),
+      signal
     });
 
     if (!response.ok) {
-      throw new Error(`Translation API error: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`خطای API ترجمه: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const data = await response.json();
     
     if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
-      throw new Error('Invalid response format from translation API');
+      throw new Error('فرمت پاسخ نامعتبر از API ترجمه');
     }
 
     const translatedText = data.candidates[0].content.parts[0].text;

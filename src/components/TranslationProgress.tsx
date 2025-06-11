@@ -3,28 +3,40 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { Download, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { Download, Loader2, CheckCircle, AlertCircle, StopCircle, Clock } from 'lucide-react';
+import { TranslationStatus } from '@/utils/translator';
 
 interface TranslationProgressProps {
   isTranslating: boolean;
-  progress: number;
+  status: TranslationStatus;
   translatedText: string;
   error: string | null;
+  statusMessage: string;
   onDownload: () => void;
+  onCancel: () => void;
   originalFileName: string;
 }
 
 const TranslationProgress: React.FC<TranslationProgressProps> = ({
   isTranslating,
-  progress,
+  status,
   translatedText,
   error,
+  statusMessage,
   onDownload,
+  onCancel,
   originalFileName,
 }) => {
   if (!isTranslating && !translatedText && !error) {
     return null;
   }
+
+  const formatTime = (ms: number) => {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
 
   return (
     <Card className="glass-effect hover-glow animate-fade-in">
@@ -38,12 +50,44 @@ const TranslationProgress: React.FC<TranslationProgressProps> = ({
       </CardHeader>
       <CardContent className="space-y-4">
         {isTranslating && (
-          <div className="space-y-2">
+          <div className="space-y-4">
             <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">در حال ترجمه...</span>
-              <span className="text-primary font-mono">{progress}%</span>
+              <span className="text-muted-foreground">{statusMessage}</span>
+              <span className="text-primary font-mono">{status.progress}%</span>
             </div>
-            <Progress value={progress} className="w-full animate-pulse-glow" />
+            <Progress value={status.progress} className="w-full animate-pulse-glow" />
+            
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">بخش فعلی:</span>
+                <span className="text-primary font-mono">{status.currentChunk} / {status.totalChunks}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">ترجمه شده:</span>
+                <span className="text-primary font-mono">{status.translatedCount} / {status.totalTexts}</span>
+              </div>
+            </div>
+
+            {status.estimatedTimeRemaining && (
+              <div className="flex items-center justify-center gap-2 p-2 bg-muted/30 rounded-lg">
+                <Clock className="w-4 h-4 text-primary" />
+                <span className="text-sm text-muted-foreground">
+                  زمان تخمینی باقی‌مانده: 
+                  <span className="text-primary font-mono ml-1">
+                    {formatTime(status.estimatedTimeRemaining)}
+                  </span>
+                </span>
+              </div>
+            )}
+
+            <Button
+              onClick={onCancel}
+              variant="destructive"
+              className="w-full"
+            >
+              <StopCircle className="w-4 h-4 mr-2" />
+              توقف ترجمه
+            </Button>
           </div>
         )}
 
@@ -60,6 +104,9 @@ const TranslationProgress: React.FC<TranslationProgressProps> = ({
               <p className="text-green-400 font-medium flex items-center gap-2">
                 <CheckCircle className="w-4 h-4" />
                 ترجمه با موفقیت انجام شد!
+              </p>
+              <p className="text-green-400/80 text-sm mt-1">
+                {status.translatedCount} خط با موفقیت ترجمه شد
               </p>
             </div>
             
