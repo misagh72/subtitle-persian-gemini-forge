@@ -1,13 +1,16 @@
-
 export interface TranslationSettings {
   temperature: number;
   topP: number;
   topK: number;
   apiKey?: string;
+  baseDelay: number;
+  quotaDelay: number;
+  numberOfChunks: number;
+  geminiModel: string;
 }
 
 export class GeminiTranslator {
-  private static readonly DEFAULT_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
+  private static readonly DEFAULT_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
   
   static async translateTexts(
     texts: string[], 
@@ -17,10 +20,11 @@ export class GeminiTranslator {
     const translations = new Map<string, string>();
     const totalTexts = texts.length;
     
-    // Process texts in batches to avoid API limits
-    const batchSize = 5;
-    for (let i = 0; i < totalTexts; i += batchSize) {
-      const batch = texts.slice(i, Math.min(i + batchSize, totalTexts));
+    // Calculate chunk size based on numberOfChunks setting
+    const chunkSize = Math.ceil(totalTexts / settings.numberOfChunks);
+    
+    for (let i = 0; i < totalTexts; i += chunkSize) {
+      const batch = texts.slice(i, Math.min(i + chunkSize, totalTexts));
       
       try {
         const batchTranslations = await this.translateBatch(batch, settings);
@@ -31,16 +35,37 @@ export class GeminiTranslator {
           }
         });
         
-        const progress = Math.min(((i + batchSize) / totalTexts) * 100, 100);
+        const progress = Math.min(((i + chunkSize) / totalTexts) * 100, 100);
         onProgress?.(Math.round(progress));
         
-        // Small delay to avoid rate limiting
-        if (i + batchSize < totalTexts) {
-          await new Promise(resolve => setTimeout(resolve, 100));
+        // Apply base delay between batches
+        if (i + chunkSize < totalTexts) {
+          await new Promise(resolve => setTimeout(resolve, settings.baseDelay));
         }
       } catch (error) {
         console.error('Translation batch failed:', error);
-        // Continue with next batch even if one fails
+        
+        // Check if it's a quota/rate limit error and apply quota delay
+        if (error instanceof Error && (
+          error.message.includes('quota') || 
+          error.message.includes('rate') ||
+          error.message.includes('429')
+        )) {
+          console.log(`Quota limit hit, waiting ${settings.quotaDelay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, settings.quotaDelay));
+          
+          // Retry the batch after quota delay
+          try {
+            const retryTranslations = await this.translateBatch(batch, settings);
+            batch.forEach((text, index) => {
+              if (retryTranslations[index]) {
+                translations.set(text, retryTranslations[index]);
+              }
+            });
+          } catch (retryError) {
+            console.error('Retry after quota delay also failed:', retryError);
+          }
+        }
       }
     }
     
@@ -62,8 +87,8 @@ export class GeminiTranslator {
       }
     };
 
-    const apiKey = settings.apiKey || 'AIzaSyBvZwZQ_Qy9r8vK7NxY2mL4jP6wX3oE8tA'; // Default demo key
-    const response = await fetch(`${this.DEFAULT_API_ENDPOINT}?key=${apiKey}`, {
+    const apiKey = settings.apiKey || 'AIzaSyBvZwZQ_Qy9r8vK7NxY2mL4jP6wX3oE8tA';
+    const response = await fetch(`${this.DEFAULT_API_ENDPOINT}/${settings.geminiModel}:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

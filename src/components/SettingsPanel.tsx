@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Settings } from 'lucide-react';
 
 interface SettingsPanelProps {
@@ -18,6 +19,14 @@ interface SettingsPanelProps {
   setTopK: (topK: number) => void;
   usePersonalApi: boolean;
   setUsePersonalApi: (use: boolean) => void;
+  baseDelay: number;
+  setBaseDelay: (delay: number) => void;
+  quotaDelay: number;
+  setQuotaDelay: (delay: number) => void;
+  numberOfChunks: number;
+  setNumberOfChunks: (chunks: number) => void;
+  geminiModel: string;
+  setGeminiModel: (model: string) => void;
 }
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
@@ -31,7 +40,22 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   setTopK,
   usePersonalApi,
   setUsePersonalApi,
+  baseDelay,
+  setBaseDelay,
+  quotaDelay,
+  setQuotaDelay,
+  numberOfChunks,
+  setNumberOfChunks,
+  geminiModel,
+  setGeminiModel,
 }) => {
+  const geminiModels = [
+    { value: 'gemini-2.0-flash-exp', label: 'Gemini 2 Flash (پیشفرض)' },
+    { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+    { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
+    { value: 'gemini-pro', label: 'Gemini Pro' },
+  ];
+
   return (
     <Card className="glass-effect hover-glow animate-fade-in">
       <CardHeader>
@@ -72,6 +96,22 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
 
         <div className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-foreground">انتخاب مدل Gemini</Label>
+            <Select value={geminiModel} onValueChange={setGeminiModel}>
+              <SelectTrigger className="bg-input border-border focus:border-primary">
+                <SelectValue placeholder="مدل Gemini را انتخاب کنید" />
+              </SelectTrigger>
+              <SelectContent>
+                {geminiModels.map((model) => (
+                  <SelectItem key={model.value} value={model.value}>
+                    {model.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-2">
             <Label className="text-foreground flex justify-between">
               <span>Temperature</span>
@@ -123,6 +163,60 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             />
             <p className="text-xs text-muted-foreground">
               تعداد گزینه‌های کلمات (1 = یکسان، 100 = متنوع)
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-foreground flex justify-between">
+              <span>Base Delay (ms)</span>
+              <span className="text-primary font-mono">{baseDelay}</span>
+            </Label>
+            <Slider
+              value={[baseDelay]}
+              onValueChange={(value) => setBaseDelay(value[0])}
+              max={5000}
+              min={100}
+              step={100}
+              className="w-full"
+            />
+            <p className="text-xs text-muted-foreground">
+              تاخیر پایه بین درخواست‌های API (میلی‌ثانیه)
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-foreground flex justify-between">
+              <span>Quota Delay (ms)</span>
+              <span className="text-primary font-mono">{quotaDelay}</span>
+            </Label>
+            <Slider
+              value={[quotaDelay]}
+              onValueChange={(value) => setQuotaDelay(value[0])}
+              max={30000}
+              min={1000}
+              step={1000}
+              className="w-full"
+            />
+            <p className="text-xs text-muted-foreground">
+              تاخیر هنگام رسیدن به محدودیت API (میلی‌ثانیه)
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-foreground flex justify-between">
+              <span>Number of Chunks</span>
+              <span className="text-primary font-mono">{numberOfChunks}</span>
+            </Label>
+            <Slider
+              value={[numberOfChunks]}
+              onValueChange={(value) => setNumberOfChunks(value[0])}
+              max={20}
+              min={1}
+              step={1}
+              className="w-full"
+            />
+            <p className="text-xs text-muted-foreground">
+              تعداد بخش‌های تقسیم فایل برای ترجمه (1 = یکجا، 20 = بخش‌های کوچک)
             </p>
           </div>
         </div>

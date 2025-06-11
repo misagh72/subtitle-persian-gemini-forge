@@ -25,6 +25,10 @@ const Index = () => {
   const [topP, setTopP] = useState(0.9);
   const [topK, setTopK] = useState(40);
   const [usePersonalApi, setUsePersonalApi] = useState(false);
+  const [baseDelay, setBaseDelay] = useState(1000);
+  const [quotaDelay, setQuotaDelay] = useState(10000);
+  const [numberOfChunks, setNumberOfChunks] = useState(5);
+  const [geminiModel, setGeminiModel] = useState('gemini-2.0-flash-exp');
 
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
@@ -96,6 +100,10 @@ const Index = () => {
         topP,
         topK,
         apiKey: usePersonalApi ? apiKey : undefined,
+        baseDelay,
+        quotaDelay,
+        numberOfChunks,
+        geminiModel,
       };
 
       const translations = await GeminiTranslator.translateTexts(
@@ -234,6 +242,14 @@ const Index = () => {
               setTopK={setTopK}
               usePersonalApi={usePersonalApi}
               setUsePersonalApi={setUsePersonalApi}
+              baseDelay={baseDelay}
+              setBaseDelay={setBaseDelay}
+              quotaDelay={quotaDelay}
+              setQuotaDelay={setQuotaDelay}
+              numberOfChunks={numberOfChunks}
+              setNumberOfChunks={setNumberOfChunks}
+              geminiModel={geminiModel}
+              setGeminiModel={setGeminiModel}
             />
 
             {/* Features Card */}
@@ -266,6 +282,14 @@ const Index = () => {
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-primary rounded-full"></div>
                     <span>تنظیمات پیشرفته AI</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-primary rounded-full"></div>
+                    <span>کنترل تاخیر و تقسیم‌بندی</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-primary rounded-full"></div>
+                    <span>انتخاب مدل Gemini</span>
                   </div>
                 </div>
               </CardContent>
