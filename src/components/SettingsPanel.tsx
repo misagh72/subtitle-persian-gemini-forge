@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -7,7 +6,7 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Settings, Zap, Balance, Sparkles2 } from 'lucide-react';
+import { Settings, Zap, Scale, Sparkles } from 'lucide-react';
 import { TRANSLATION_PRESETS } from '@/hooks/useTranslationState';
 
 interface SettingsPanelProps {
@@ -66,8 +65,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const presetButtons = [
     { key: 'fast' as const, label: 'سریع', icon: Zap, color: 'text-yellow-500' },
-    { key: 'balanced' as const, label: 'متعادل', icon: Balance, color: 'text-blue-500' },
-    { key: 'quality' as const, label: 'با کیفیت', icon: Sparkles2, color: 'text-purple-500' },
+    { key: 'balanced' as const, label: 'متعادل', icon: Scale, color: 'text-blue-500' },
+    { key: 'quality' as const, label: 'با کیفیت', icon: Sparkles, color: 'text-purple-500' },
   ];
 
   return (
