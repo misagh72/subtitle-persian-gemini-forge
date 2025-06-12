@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { TranslationSettings, TranslationStatus } from '@/utils/translator';
 import { TranslationQualitySettings } from '@/utils/translationQuality';
@@ -67,18 +68,25 @@ export const useTranslationState = () => {
   }, [updateState, resetTranslation]);
 
   const addQualityScores = useCallback((scores: QualityScore[]) => {
-    updateState(prev => ({
+    setState(prev => ({
+      ...prev,
       qualityScores: [...prev.qualityScores, ...scores]
     }));
-  }, [updateState]);
+  }, []);
 
   const toggleQualityReport = useCallback(() => {
-    updateState(prev => ({ showQualityReport: !prev.showQualityReport }));
-  }, [updateState]);
+    setState(prev => ({ 
+      ...prev, 
+      showQualityReport: !prev.showQualityReport 
+    }));
+  }, []);
 
   const toggleMemoryManagement = useCallback(() => {
-    updateState(prev => ({ showMemoryManagement: !prev.showMemoryManagement }));
-  }, [updateState]);
+    setState(prev => ({ 
+      ...prev, 
+      showMemoryManagement: !prev.showMemoryManagement 
+    }));
+  }, []);
 
   return {
     ...state,
