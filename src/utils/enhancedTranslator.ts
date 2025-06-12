@@ -1,6 +1,7 @@
 
 import { TranslationSettings, TranslationStatus } from './translator';
 import { TranslationQualitySettings, TranslationQualityService } from './translationQuality';
+import { TranslationMemory, QualityScore } from './translationMemory';
 
 export interface EnhancedTranslationSettings extends TranslationSettings {
   qualitySettings: TranslationQualitySettings;
@@ -14,11 +15,13 @@ export class EnhancedGeminiTranslator {
     texts: string[], 
     settings: EnhancedTranslationSettings,
     onProgress?: (status: TranslationStatus) => void,
-    onStatusUpdate?: (message: string) => void
+    onStatusUpdate?: (message: string) => void,
+    onQualityScore?: (scores: QualityScore[]) => void
   ): Promise<Map<string, string>> {
     this.abortController = new AbortController();
     
     const translations = new Map<string, string>();
+    const qualityScores: QualityScore[] = [];
     const totalTexts = texts.length;
     const chunkSize = Math.ceil(totalTexts / settings.numberOfChunks);
     const maxRetries = settings.maxRetries || 3;
@@ -39,94 +42,148 @@ export class EnhancedGeminiTranslator {
       const currentChunk = Math.floor(i / chunkSize) + 1;
       const totalChunks = Math.ceil(totalTexts / chunkSize);
       
-      onStatusUpdate?.(`ترجمه بخش ${currentChunk} از ${totalChunks} با کنترل کیفیت...`);
+      onStatusUpdate?.(`ترجمه بخش ${currentChunk} از ${totalChunks} با بررسی حافظه ترجمه...`);
       
-      let retryCount = 0;
-      let batchSuccess = false;
+      // Check memory for existing translations
+      const memoryResults = new Map<string, string>();
+      const needsTranslation: string[] = [];
+      const needsTranslationOriginal: string[] = [];
       
-      while (retryCount <= maxRetries && !batchSuccess && !this.abortController.signal.aborted) {
-        try {
-          const batchTranslations = await this.translateBatch(
-            batch, 
-            settings, 
-            this.abortController.signal
-          );
-          
-          // Post-process and validate translations
-          originalBatch.forEach((originalText, index) => {
-            if (batchTranslations[index]) {
-              let translation = TranslationQualityService.cleanText(batchTranslations[index]);
-              
-              // Quality check if enabled
-              if (settings.qualitySettings.qualityCheck) {
-                const metrics = TranslationQualityService.validateTranslation(originalText, translation);
+      for (let j = 0; j < batch.length; j++) {
+        const text = batch[j];
+        const originalText = originalBatch[j];
+        const similar = TranslationMemory.findSimilar(text, 0.95);
+        
+        if (similar.length > 0 && similar[0].confidence > 0.98) {
+          // Use memory translation
+          memoryResults.set(originalText, similar[0].target);
+          onStatusUpdate?.(`استفاده از حافظه ترجمه: ${similar[0].confidence.toFixed(2)} اطمینان`);
+        } else {
+          needsTranslation.push(text);
+          needsTranslationOriginal.push(originalText);
+        }
+      }
+      
+      // Add memory translations
+      memoryResults.forEach((translation, original) => {
+        translations.set(original, translation);
+      });
+      
+      // Translate remaining texts
+      if (needsTranslation.length > 0) {
+        let retryCount = 0;
+        let batchSuccess = false;
+        
+        while (retryCount <= maxRetries && !batchSuccess && !this.abortController.signal.aborted) {
+          try {
+            const batchTranslations = await this.translateBatch(
+              needsTranslation, 
+              settings, 
+              this.abortController.signal
+            );
+            
+            // Post-process and validate translations
+            needsTranslationOriginal.forEach((originalText, index) => {
+              if (batchTranslations[index]) {
+                let translation = TranslationQualityService.cleanText(batchTranslations[index]);
                 
-                // If quality is too low, we could potentially retry or log the issue
-                if (metrics.score < 50) {
-                  console.warn(`Low quality translation detected for: "${originalText}"`);
-                  console.warn(`Issues: ${metrics.issues.join(', ')}`);
+                // Quality check and scoring
+                if (settings.qualitySettings.qualityCheck) {
+                  const qualityScore = TranslationMemory.generateQualityScore(
+                    originalText, 
+                    translation, 
+                    settings.qualitySettings.genre
+                  );
+                  qualityScores.push(qualityScore);
+                  
+                  // Log quality issues
+                  if (qualityScore.overall < 70) {
+                    console.warn(`Low quality translation detected for: "${originalText}"`);
+                    console.warn(`Score: ${qualityScore.overall}, Suggestions: ${qualityScore.suggestions.join(', ')}`);
+                  }
                 }
+                
+                // Add to memory
+                TranslationMemory.addEntry({
+                  source: needsTranslation[index],
+                  target: translation,
+                  confidence: 1.0,
+                  timestamp: Date.now(),
+                  context: settings.qualitySettings.genre
+                });
+                
+                translations.set(originalText, translation);
               }
-              
-              translations.set(originalText, translation);
+            });
+            
+            batchSuccess = true;
+            
+            // Report quality scores
+            if (qualityScores.length > 0) {
+              onQualityScore?.(qualityScores);
             }
-          });
-          
-          batchSuccess = true;
-          
-          const progress = Math.min(((i + chunkSize) / totalTexts) * 100, 100);
-          const elapsedTime = Date.now() - startTime;
-          const estimatedTotal = (elapsedTime / progress) * 100;
-          const estimatedTimeRemaining = Math.max(0, estimatedTotal - elapsedTime);
-          
-          onProgress?.({
-            isTranslating: true,
-            progress: Math.round(progress),
-            currentChunk,
-            totalChunks,
-            translatedCount: translations.size,
-            totalTexts,
-            estimatedTimeRemaining
-          });
-          
-        } catch (error) {
-          retryCount++;
-          
-          if (this.abortController.signal.aborted) {
-            throw new Error('ترجمه توسط کاربر متوقف شد');
-          }
-          
-          console.error(`خطا در ترجمه بخش ${currentChunk}, تلاش ${retryCount}:`, error);
-          
-          const isQuotaError = error instanceof Error && (
-            error.message.includes('quota') || 
-            error.message.includes('rate') ||
-            error.message.includes('429')
-          );
-          
-          if (isQuotaError && retryCount <= maxRetries) {
-            onStatusUpdate?.(`محدودیت API رسید، انتظار ${settings.quotaDelay / 1000} ثانیه...`);
-            await new Promise(resolve => setTimeout(resolve, settings.quotaDelay));
-          } else if (retryCount <= maxRetries) {
-            onStatusUpdate?.(`تلاش مجدد ${retryCount} از ${maxRetries}...`);
-            await new Promise(resolve => setTimeout(resolve, 2000));
-          } else {
-            onStatusUpdate?.(`خطا در ترجمه بخش ${currentChunk}: ${error instanceof Error ? error.message : 'خطای نامشخص'}`);
-            break;
+            
+            const progress = Math.min(((i + chunkSize) / totalTexts) * 100, 100);
+            const elapsedTime = Date.now() - startTime;
+            const estimatedTotal = (elapsedTime / progress) * 100;
+            const estimatedTimeRemaining = Math.max(0, estimatedTotal - elapsedTime);
+            
+            onProgress?.({
+              isTranslating: true,
+              progress: Math.round(progress),
+              currentChunk,
+              totalChunks,
+              translatedCount: translations.size,
+              totalTexts,
+              estimatedTimeRemaining
+            });
+            
+          } catch (error) {
+            retryCount++;
+            
+            if (this.abortController.signal.aborted) {
+              throw new Error('ترجمه توسط کاربر متوقف شد');
+            }
+            
+            console.error(`خطا در ترجمه بخش ${currentChunk}, تلاش ${retryCount}:`, error);
+            
+            const isQuotaError = error instanceof Error && (
+              error.message.includes('quota') || 
+              error.message.includes('rate') ||
+              error.message.includes('429')
+            );
+            
+            if (isQuotaError && retryCount <= maxRetries) {
+              onStatusUpdate?.(`محدودیت API رسید، انتظار ${settings.quotaDelay / 1000} ثانیه...`);
+              await new Promise(resolve => setTimeout(resolve, settings.quotaDelay));
+            } else if (retryCount <= maxRetries) {
+              onStatusUpdate?.(`تلاش مجدد ${retryCount} از ${maxRetries}...`);
+              await new Promise(resolve => setTimeout(resolve, 2000));
+            } else {
+              onStatusUpdate?.(`خطا در ترجمه بخش ${currentChunk}: ${error instanceof Error ? error.message : 'خطای نامشخص'}`);
+              break;
+            }
           }
         }
       }
       
-      if (batchSuccess && i + chunkSize < totalTexts && !this.abortController.signal.aborted) {
+      if (i + chunkSize < totalTexts && !this.abortController.signal.aborted) {
         await new Promise(resolve => setTimeout(resolve, settings.baseDelay));
       }
     }
     
-    // Generate quality report if enabled
-    if (settings.qualitySettings.qualityCheck && translations.size > 0) {
-      const report = TranslationQualityService.generateQualityReport(translations, settings.qualitySettings);
-      console.log('Quality Report:', report);
-      onStatusUpdate?.('تولید گزارش کیفیت انجام شد');
+    // Generate final quality report
+    if (settings.qualitySettings.qualityCheck && qualityScores.length > 0) {
+      const avgScore = qualityScores.reduce((sum, score) => sum + score.overall, 0) / qualityScores.length;
+      const report = `گزارش نهایی کیفیت ترجمه:
+امتیاز کلی: ${avgScore.toFixed(1)}/100
+تعداد ترجمه: ${qualityScores.length}
+استفاده از حافظه: ${translations.size - qualityScores.length} ترجمه
+نوع محتوا: ${settings.qualitySettings.genre}
+سطح رسمیت: ${settings.qualitySettings.formalityLevel}`;
+      
+      console.log('Final Quality Report:', report);
+      onStatusUpdate?.('گزارش کیفیت نهایی تولید شد');
     }
     
     return translations;

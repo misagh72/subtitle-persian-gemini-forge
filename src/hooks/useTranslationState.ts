@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { TranslationSettings, TranslationStatus } from '@/utils/translator';
 import { TranslationQualitySettings } from '@/utils/translationQuality';
+import { QualityScore } from '@/utils/translationMemory';
 
 export interface TranslationState {
   selectedFile: File | null;
@@ -10,6 +11,9 @@ export interface TranslationState {
   status: TranslationStatus;
   statusMessage: string;
   dialogueCount: number;
+  qualityScores: QualityScore[];
+  showQualityReport: boolean;
+  showMemoryManagement: boolean;
 }
 
 export const useTranslationState = () => {
@@ -27,7 +31,10 @@ export const useTranslationState = () => {
       totalTexts: 0
     },
     statusMessage: '',
-    dialogueCount: 0
+    dialogueCount: 0,
+    qualityScores: [],
+    showQualityReport: false,
+    showMemoryManagement: false
   });
 
   const updateState = useCallback((updates: Partial<TranslationState>) => {
@@ -47,7 +54,8 @@ export const useTranslationState = () => {
         translatedCount: 0,
         totalTexts: 0
       },
-      statusMessage: ''
+      statusMessage: '',
+      qualityScores: []
     });
   }, [updateState]);
 
@@ -58,11 +66,28 @@ export const useTranslationState = () => {
     }
   }, [updateState, resetTranslation]);
 
+  const addQualityScores = useCallback((scores: QualityScore[]) => {
+    updateState(prev => ({
+      qualityScores: [...prev.qualityScores, ...scores]
+    }));
+  }, [updateState]);
+
+  const toggleQualityReport = useCallback(() => {
+    updateState(prev => ({ showQualityReport: !prev.showQualityReport }));
+  }, [updateState]);
+
+  const toggleMemoryManagement = useCallback(() => {
+    updateState(prev => ({ showMemoryManagement: !prev.showMemoryManagement }));
+  }, [updateState]);
+
   return {
     ...state,
     updateState,
     resetTranslation,
-    setSelectedFile
+    setSelectedFile,
+    addQualityScores,
+    toggleQualityReport,
+    toggleMemoryManagement
   };
 };
 

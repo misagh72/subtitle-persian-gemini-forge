@@ -1,13 +1,17 @@
+
 import React, { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Languages, Sparkles } from 'lucide-react';
+import { Languages, Sparkles, BarChart3, Brain } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import FileUpload from '@/components/FileUpload';
 import FileStats from '@/components/FileStats';
 import SettingsPanel from '@/components/SettingsPanel';
 import QualitySettingsPanel from '@/components/QualitySettingsPanel';
 import TranslationProgress from '@/components/TranslationProgress';
+import QualityReport from '@/components/QualityReport';
+import TranslationPreview from '@/components/TranslationPreview';
+import MemoryManagement from '@/components/MemoryManagement';
 import { AssParser } from '@/utils/assParser';
 import { EnhancedGeminiTranslator } from '@/utils/enhancedTranslator';
 import { useTranslationState, useSettingsState } from '@/hooks/useTranslationState';
@@ -22,9 +26,15 @@ const Index = () => {
     status,
     statusMessage,
     dialogueCount,
+    qualityScores,
+    showQualityReport,
+    showMemoryManagement,
     updateState,
     resetTranslation,
-    setSelectedFile
+    setSelectedFile,
+    addQualityScores,
+    toggleQualityReport,
+    toggleMemoryManagement
   } = useTranslationState();
   
   const {
@@ -85,6 +95,7 @@ const Index = () => {
     updateState({
       isTranslating: true,
       error: null,
+      qualityScores: [],
       status: {
         isTranslating: true,
         progress: 0,
@@ -108,7 +119,7 @@ const Index = () => {
       }
 
       toast({
-        title: "شروع ترجمه با کیفیت بهبود یافته",
+        title: "شروع ترجمه با سیستم هوشمند",
         description: `${dialogueTexts.length} خط متن برای ترجمه یافت شد`
       });
 
@@ -121,7 +132,8 @@ const Index = () => {
         dialogueTexts, 
         enhancedSettings,
         newStatus => updateState({ status: newStatus }),
-        message => updateState({ statusMessage: message })
+        message => updateState({ statusMessage: message }),
+        scores => addQualityScores(scores)
       );
 
       const translatedAssContent = AssParser.reconstructAssFile(parsedLines, translations);
@@ -239,7 +251,7 @@ const Index = () => {
                   className="w-full h-14 text-lg bg-primary hover:bg-primary/90 text-primary-foreground hover-glow transition-all duration-300"
                 >
                   <Languages className="w-5 h-5 mr-2" />
-                  شروع ترجمه با کیفیت بهبود یافته
+                  شروع ترجمه هوشمند با کیفیت بالا
                 </Button>
               </div>
             )}
@@ -255,10 +267,47 @@ const Index = () => {
               onCancel={handleCancelTranslation} 
               originalFileName={selectedFile?.name || ''} 
             />
+
+            {/* Translation Preview */}
+            <TranslationPreview
+              original={selectedFile ? '' : ''} // We'll need to store original content
+              translated={translatedContent}
+              isVisible={!!translatedContent && !error}
+              onDownload={handleDownload}
+              fileName={selectedFile?.name || ''}
+            />
           </div>
 
           {/* Settings Panel */}
           <div className="space-y-6">
+            {/* Quality Report Toggle */}
+            <div className="flex gap-2">
+              <Button
+                variant={showQualityReport ? "default" : "outline"}
+                size="sm"
+                onClick={toggleQualityReport}
+                className="flex-1"
+              >
+                <BarChart3 className="w-4 h-4 mr-1" />
+                گزارش کیفیت
+              </Button>
+              <Button
+                variant={showMemoryManagement ? "default" : "outline"}
+                size="sm"
+                onClick={toggleMemoryManagement}
+                className="flex-1"
+              >
+                <Brain className="w-4 h-4 mr-1" />
+                حافظه ترجمه
+              </Button>
+            </div>
+
+            {/* Quality Report */}
+            <QualityReport scores={qualityScores} isVisible={showQualityReport} />
+
+            {/* Memory Management */}
+            <MemoryManagement isVisible={showMemoryManagement} />
+
             {/* Quality Settings */}
             <QualitySettingsPanel 
               qualitySettings={qualitySettings}
@@ -292,36 +341,36 @@ const Index = () => {
               onApplyPreset={applyPreset}
             />
 
-            {/* Features Card */}
+            {/* Enhanced Features Card */}
             <Card className="glass-effect hover-glow animate-fade-in">
               <CardHeader>
-                <CardTitle className="text-foreground">ویژگی‌های جدید</CardTitle>
+                <CardTitle className="text-foreground">ویژگی‌های سیستم هوشمند</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span>ترجمه زمینه‌ای و ژانری</span>
+                    <span>حافظه ترجمه هوشمند</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span>کنترل کیفیت خودکار</span>
+                    <span>امتیازدهی کیفیت real-time</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span>حفظ نام‌ها و اصطلاحات</span>
+                    <span>تشخیص ترجمه‌های مشابه</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span>تنظیمات سطح رسمیت</span>
+                    <span>پیش‌نمایش و مقایسه</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span>پیش و پس پردازش متن</span>
+                    <span>صادرات و وارد کردن حافظه</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span>گزارش کیفیت ترجمه</span>
+                    <span>گزارش تفصیلی کیفیت</span>
                   </div>
                 </div>
               </CardContent>
