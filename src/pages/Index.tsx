@@ -6,14 +6,14 @@ import { useToast } from '@/hooks/use-toast';
 import FileUpload from '@/components/FileUpload';
 import FileStats from '@/components/FileStats';
 import SettingsPanel from '@/components/SettingsPanel';
+import QualitySettingsPanel from '@/components/QualitySettingsPanel';
 import TranslationProgress from '@/components/TranslationProgress';
 import { AssParser } from '@/utils/assParser';
-import { GeminiTranslator } from '@/utils/translator';
+import { EnhancedGeminiTranslator } from '@/utils/enhancedTranslator';
 import { useTranslationState, useSettingsState } from '@/hooks/useTranslationState';
+
 const Index = () => {
-  const {
-    toast
-  } = useToast();
+  const { toast } = useToast();
   const {
     selectedFile,
     isTranslating,
@@ -26,9 +26,12 @@ const Index = () => {
     resetTranslation,
     setSelectedFile
   } = useTranslationState();
+  
   const {
     settings,
+    qualitySettings,
     updateSettings,
+    updateQualitySettings,
     applyPreset
   } = useSettingsState();
 
@@ -44,6 +47,7 @@ const Index = () => {
       }).catch(console.error);
     }
   }, [selectedFile, updateState]);
+
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
     toast({
@@ -51,12 +55,14 @@ const Index = () => {
       description: `${file.name} آماده ترجمه است`
     });
   };
+
   const handleRemoveFile = () => {
     setSelectedFile(null);
     updateState({
       dialogueCount: 0
     });
   };
+
   const handleTranslate = async () => {
     if (!selectedFile) {
       toast({
@@ -66,6 +72,7 @@ const Index = () => {
       });
       return;
     }
+
     if (settings.usePersonalApi && !settings.apiKey.trim()) {
       toast({
         title: "خطا",
@@ -74,6 +81,7 @@ const Index = () => {
       });
       return;
     }
+
     updateState({
       isTranslating: true,
       error: null,
@@ -86,34 +94,38 @@ const Index = () => {
         totalTexts: 0
       }
     });
+
     try {
       const fileContent = await selectedFile.text();
       const parsedLines = AssParser.parseAssFile(fileContent);
-      const dialogueTexts = parsedLines.filter(line => line.type === 'dialogue' && line.text && line.text.trim()).map(line => line.text!).filter((text, index, array) => array.indexOf(text) === index);
+      const dialogueTexts = parsedLines
+        .filter(line => line.type === 'dialogue' && line.text && line.text.trim())
+        .map(line => line.text!)
+        .filter((text, index, array) => array.indexOf(text) === index);
+
       if (dialogueTexts.length === 0) {
         throw new Error('هیچ متن قابل ترجمه‌ای در فایل یافت نشد');
       }
+
       toast({
-        title: "شروع ترجمه",
+        title: "شروع ترجمه با کیفیت بهبود یافته",
         description: `${dialogueTexts.length} خط متن برای ترجمه یافت شد`
       });
-      const translationSettings = {
-        temperature: settings.temperature,
-        topP: settings.topP,
-        topK: settings.topK,
-        apiKey: settings.usePersonalApi ? settings.apiKey : undefined,
-        baseDelay: settings.baseDelay,
-        quotaDelay: settings.quotaDelay,
-        numberOfChunks: settings.numberOfChunks,
-        geminiModel: settings.geminiModel,
-        maxRetries: settings.maxRetries
+
+      const enhancedSettings = {
+        ...settings,
+        qualitySettings
       };
-      const translations = await GeminiTranslator.translateTexts(dialogueTexts, translationSettings, newStatus => updateState({
-        status: newStatus
-      }), message => updateState({
-        statusMessage: message
-      }));
+
+      const translations = await EnhancedGeminiTranslator.translateTexts(
+        dialogueTexts, 
+        enhancedSettings,
+        newStatus => updateState({ status: newStatus }),
+        message => updateState({ statusMessage: message })
+      );
+
       const translatedAssContent = AssParser.reconstructAssFile(parsedLines, translations);
+      
       updateState({
         translatedContent: translatedAssContent,
         status: {
@@ -121,28 +133,27 @@ const Index = () => {
           progress: 100
         }
       });
+
       toast({
-        title: "ترجمه تکمیل شد",
+        title: "ترجمه با کیفیت بالا تکمیل شد",
         description: `${translations.size} خط با موفقیت ترجمه شد`
       });
+
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'خطای نامشخص در ترجمه';
-      updateState({
-        error: errorMessage
-      });
+      updateState({ error: errorMessage });
       toast({
         title: "خطا در ترجمه",
         description: errorMessage,
         variant: "destructive"
       });
     } finally {
-      updateState({
-        isTranslating: false
-      });
+      updateState({ isTranslating: false });
     }
   };
+
   const handleCancelTranslation = () => {
-    GeminiTranslator.cancelTranslation();
+    EnhancedGeminiTranslator.cancelTranslation();
     updateState({
       isTranslating: false,
       statusMessage: 'ترجمه توسط کاربر متوقف شد'
@@ -152,8 +163,10 @@ const Index = () => {
       description: "ترجمه توسط کاربر لغو شد"
     });
   };
+
   const handleDownload = () => {
     if (!translatedContent || !selectedFile) return;
+
     const blob = new Blob([translatedContent], {
       type: 'text/plain;charset=utf-8'
     });
@@ -165,12 +178,15 @@ const Index = () => {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+
     toast({
       title: "دانلود انجام شد",
       description: "فایل ترجمه شده دانلود شد"
     });
   };
-  return <div className="min-h-screen bg-background text-foreground">
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
       <header className="border-b border-border/50 glass-effect">
         <div className="container mx-auto px-4 py-6">
@@ -183,7 +199,7 @@ const Index = () => {
               <Sparkles className="w-8 h-8 text-primary animate-pulse-glow" />
             </div>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              ترجمه حرفه‌ای زیرنویس‌های ASS به فارسی با حفظ فرمت و تگ‌های اصلی
+              ترجمه حرفه‌ای زیرنویس‌های ASS به فارسی با کیفیت بهبود یافته
             </p>
           </div>
         </div>
@@ -200,51 +216,81 @@ const Index = () => {
                 <CardTitle className="text-2xl text-foreground">انتخاب فایل</CardTitle>
               </CardHeader>
               <CardContent>
-                <FileUpload onFileSelect={handleFileSelect} selectedFile={selectedFile} onRemoveFile={handleRemoveFile} />
+                <FileUpload 
+                  onFileSelect={handleFileSelect} 
+                  selectedFile={selectedFile} 
+                  onRemoveFile={handleRemoveFile} 
+                />
               </CardContent>
             </Card>
 
             {/* File Statistics */}
-            <FileStats selectedFile={selectedFile} dialogueCount={dialogueCount} estimatedTime={Math.ceil(dialogueCount / 10)} // Rough estimate
-          />
+            <FileStats 
+              selectedFile={selectedFile} 
+              dialogueCount={dialogueCount} 
+              estimatedTime={Math.ceil(dialogueCount / 10)}
+            />
 
             {/* Translation Button */}
-            {selectedFile && !isTranslating && <div className="animate-slide-up">
-                <Button onClick={handleTranslate} className="w-full h-14 text-lg bg-primary hover:bg-primary/90 text-primary-foreground hover-glow transition-all duration-300">
+            {selectedFile && !isTranslating && (
+              <div className="animate-slide-up">
+                <Button 
+                  onClick={handleTranslate} 
+                  className="w-full h-14 text-lg bg-primary hover:bg-primary/90 text-primary-foreground hover-glow transition-all duration-300"
+                >
                   <Languages className="w-5 h-5 mr-2" />
-                  شروع ترجمه به فارسی
+                  شروع ترجمه با کیفیت بهبود یافته
                 </Button>
-              </div>}
+              </div>
+            )}
 
             {/* Translation Progress */}
-            <TranslationProgress isTranslating={isTranslating} status={status} translatedText={translatedContent} error={error} statusMessage={statusMessage} onDownload={handleDownload} onCancel={handleCancelTranslation} originalFileName={selectedFile?.name || ''} />
+            <TranslationProgress 
+              isTranslating={isTranslating} 
+              status={status} 
+              translatedText={translatedContent} 
+              error={error} 
+              statusMessage={statusMessage} 
+              onDownload={handleDownload} 
+              onCancel={handleCancelTranslation} 
+              originalFileName={selectedFile?.name || ''} 
+            />
           </div>
 
           {/* Settings Panel */}
           <div className="space-y-6">
-            <SettingsPanel apiKey={settings.apiKey} setApiKey={key => updateSettings({
-            apiKey: key
-          })} temperature={settings.temperature} setTemperature={temp => updateSettings({
-            temperature: temp
-          })} topP={settings.topP} setTopP={topP => updateSettings({
-            topP
-          })} topK={settings.topK} setTopK={topK => updateSettings({
-            topK
-          })} usePersonalApi={settings.usePersonalApi} setUsePersonalApi={use => updateSettings({
-            usePersonalApi: use
-          })} baseDelay={settings.baseDelay} setBaseDelay={delay => updateSettings({
-            baseDelay: delay
-          })} quotaDelay={settings.quotaDelay} setQuotaDelay={delay => updateSettings({
-            quotaDelay: delay
-          })} numberOfChunks={settings.numberOfChunks} setNumberOfChunks={chunks => updateSettings({
-            numberOfChunks: chunks
-          })} geminiModel={settings.geminiModel} setGeminiModel={model => updateSettings({
-            geminiModel: model
-          })} maxRetries={settings.maxRetries} setMaxRetries={retries => updateSettings({
-            maxRetries: retries
-          })} enableThinking={settings.enableThinking} setEnableThinking={enable => updateSettings({
-            enableThinking: enable
-          })} onApplyPreset={applyPreset} />
+            {/* Quality Settings */}
+            <QualitySettingsPanel 
+              qualitySettings={qualitySettings}
+              onUpdateQualitySettings={updateQualitySettings}
+            />
+
+            {/* Technical Settings */}
+            <SettingsPanel 
+              apiKey={settings.apiKey}
+              setApiKey={key => updateSettings({ apiKey: key })}
+              temperature={settings.temperature}
+              setTemperature={temp => updateSettings({ temperature: temp })}
+              topP={settings.topP}
+              setTopP={topP => updateSettings({ topP })}
+              topK={settings.topK}
+              setTopK={topK => updateSettings({ topK })}
+              usePersonalApi={settings.usePersonalApi}
+              setUsePersonalApi={use => updateSettings({ usePersonalApi: use })}
+              baseDelay={settings.baseDelay}
+              setBaseDelay={delay => updateSettings({ baseDelay: delay })}
+              quotaDelay={settings.quotaDelay}
+              setQuotaDelay={delay => updateSettings({ quotaDelay: delay })}
+              numberOfChunks={settings.numberOfChunks}
+              setNumberOfChunks={chunks => updateSettings({ numberOfChunks: chunks })}
+              geminiModel={settings.geminiModel}
+              setGeminiModel={model => updateSettings({ geminiModel: model })}
+              maxRetries={settings.maxRetries}
+              setMaxRetries={retries => updateSettings({ maxRetries: retries })}
+              enableThinking={settings.enableThinking}
+              setEnableThinking={enable => updateSettings({ enableThinking: enable })}
+              onApplyPreset={applyPreset}
+            />
 
             {/* Features Card */}
             <Card className="glass-effect hover-glow animate-fade-in">
@@ -255,27 +301,27 @@ const Index = () => {
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span>سیستم retry هوشمند</span>
+                    <span>ترجمه زمینه‌ای و ژانری</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span>نمایش پیشرفت دقیق</span>
+                    <span>کنترل کیفیت خودکار</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span>امکان توقف ترجمه</span>
+                    <span>حفظ نام‌ها و اصطلاحات</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span>تنظیمات پیش‌فرض</span>
+                    <span>تنظیمات سطح رسمیت</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span>آمار فایل</span>
+                    <span>پیش و پس پردازش متن</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 bg-primary rounded-full"></div>
-                    <span>تخمین زمان</span>
+                    <span>گزارش کیفیت ترجمه</span>
                   </div>
                 </div>
               </CardContent>
@@ -292,6 +338,8 @@ const Index = () => {
           </div>
         </div>
       </footer>
-    </div>;
+    </div>
+  );
 };
+
 export default Index;

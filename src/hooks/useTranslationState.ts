@@ -1,6 +1,6 @@
-
 import { useState, useCallback } from 'react';
 import { TranslationSettings, TranslationStatus } from '@/utils/translator';
+import { TranslationQualitySettings } from '@/utils/translationQuality';
 
 export interface TranslationState {
   selectedFile: File | null;
@@ -121,8 +121,20 @@ export const useSettingsState = () => {
     enableThinking: false
   });
 
+  const [qualitySettings, setQualitySettings] = useState<TranslationQualitySettings>({
+    genre: 'movie',
+    formalityLevel: 'neutral',
+    preserveNames: true,
+    contextualTranslation: true,
+    qualityCheck: true
+  });
+
   const updateSettings = useCallback((updates: Partial<typeof settings>) => {
     setSettings(prev => ({ ...prev, ...updates }));
+  }, []);
+
+  const updateQualitySettings = useCallback((updates: Partial<TranslationQualitySettings>) => {
+    setQualitySettings(prev => ({ ...prev, ...updates }));
   }, []);
 
   const applyPreset = useCallback((presetName: keyof typeof TRANSLATION_PRESETS) => {
@@ -132,7 +144,9 @@ export const useSettingsState = () => {
 
   return {
     settings,
+    qualitySettings,
     updateSettings,
+    updateQualitySettings,
     applyPreset
   };
 };
