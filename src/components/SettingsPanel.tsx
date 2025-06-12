@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -30,6 +31,8 @@ interface SettingsPanelProps {
   setGeminiModel: (model: string) => void;
   maxRetries?: number;
   setMaxRetries?: (retries: number) => void;
+  enableThinking?: boolean;
+  setEnableThinking?: (enable: boolean) => void;
   onApplyPreset: (presetName: keyof typeof TRANSLATION_PRESETS) => void;
 }
 
@@ -54,10 +57,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   setGeminiModel,
   maxRetries = 3,
   setMaxRetries,
+  enableThinking = false,
+  setEnableThinking,
   onApplyPreset,
 }) => {
   const geminiModels = [
     { value: 'gemini-2.0-flash-exp', label: 'Gemini 2 Flash (پیشفرض)' },
+    { value: 'gemini-2.5-flash-preview-05-20', label: 'Gemini 2.5 Flash' },
     { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
     { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
     { value: 'gemini-pro', label: 'Gemini Pro' },
@@ -68,6 +74,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     { key: 'balanced' as const, label: 'متعادل', icon: Scale, color: 'text-blue-500' },
     { key: 'quality' as const, label: 'با کیفیت', icon: Sparkles, color: 'text-purple-500' },
   ];
+
+  const isThinkingSupported = geminiModel === 'gemini-2.5-flash-preview-05-20';
 
   return (
     <Card className="glass-effect hover-glow animate-fade-in">
@@ -145,6 +153,26 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               </SelectContent>
             </Select>
           </div>
+
+          {/* Thinking Mode for Gemini 2.5 Flash */}
+          {isThinkingSupported && setEnableThinking && (
+            <div className="space-y-2 animate-slide-up">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="thinking-mode" className="text-foreground">
+                  فعال‌سازی حالت تفکر (Thinking Mode)
+                </Label>
+                <Switch
+                  id="thinking-mode"
+                  checked={enableThinking}
+                  onCheckedChange={setEnableThinking}
+                  className="data-[state=checked]:bg-primary"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                حالت تفکر باعث تحلیل عمیق‌تر و دقت بالاتر در ترجمه می‌شود ولی زمان بیشتری طول می‌کشد
+              </p>
+            </div>
+          )}
 
           {/* AI Parameters */}
           <div className="space-y-2">

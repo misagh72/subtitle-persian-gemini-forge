@@ -107,7 +107,7 @@ export const TRANSLATION_PRESETS = {
 };
 
 export const useSettingsState = () => {
-  const [settings, setSettings] = useState<TranslationSettings & { usePersonalApi: boolean }>({
+  const [settings, setSettings] = useState<TranslationSettings & { usePersonalApi: boolean; enableThinking: boolean }>({
     apiKey: '',
     temperature: 0.7,
     topP: 0.9,
@@ -117,7 +117,8 @@ export const useSettingsState = () => {
     quotaDelay: 10000,
     numberOfChunks: 5,
     geminiModel: 'gemini-2.0-flash-exp',
-    maxRetries: 3
+    maxRetries: 3,
+    enableThinking: false
   });
 
   const updateSettings = useCallback((updates: Partial<typeof settings>) => {

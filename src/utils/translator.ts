@@ -8,6 +8,7 @@ export interface TranslationSettings {
   numberOfChunks: number;
   geminiModel: string;
   maxRetries?: number;
+  enableThinking?: boolean;
 }
 
 export interface TranslationStatus {
@@ -138,7 +139,7 @@ export class GeminiTranslator {
   ): Promise<string[]> {
     const prompt = this.createTranslationPrompt(texts);
     
-    const requestBody = {
+    const requestBody: any = {
       contents: [{
         parts: [{ text: prompt }]
       }],
@@ -149,6 +150,15 @@ export class GeminiTranslator {
         maxOutputTokens: 2048,
       }
     };
+
+    // Add thinking mode for Gemini 2.5 Flash if enabled
+    if (settings.geminiModel === 'gemini-2.5-flash-preview-05-20' && settings.enableThinking) {
+      requestBody.systemInstruction = {
+        parts: [{ 
+          text: "Think step by step about the translation. Consider context, cultural nuances, and subtitle formatting requirements before providing the final translation."
+        }]
+      };
+    }
 
     const apiKey = settings.apiKey || 'AIzaSyBvZwZQ_Qy9r8vK7NxY2mL4jP6wX3oE8tA';
     const response = await fetch(`${this.DEFAULT_API_ENDPOINT}/${settings.geminiModel}:generateContent?key=${apiKey}`, {

@@ -280,6 +280,8 @@ const Index = () => {
               setGeminiModel={(model) => updateSettings({ geminiModel: model })}
               maxRetries={settings.maxRetries}
               setMaxRetries={(retries) => updateSettings({ maxRetries: retries })}
+              enableThinking={settings.enableThinking}
+              setEnableThinking={(enable) => updateSettings({ enableThinking: enable })}
               onApplyPreset={applyPreset}
             />
 
