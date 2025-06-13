@@ -2,7 +2,7 @@
 import React, { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Languages, Sparkles, BarChart3, Brain, Zap, Shield, Cpu } from 'lucide-react';
+import { Languages, Sparkles, BarChart3, Brain, Zap, Shield, Cpu, Rocket, Star, Award } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import FileUpload from '@/components/FileUpload';
 import FileStats from '@/components/FileStats';
@@ -198,62 +198,105 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Enhanced Header with gradient background */}
-      <header className="relative border-b border-border/30 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5"></div>
-        <div className="relative container-enhanced py-12">
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Background Effects */}
+      <div className="fixed inset-0 z-0">
+        <div className="absolute inset-0 bg-mesh-gradient opacity-40"></div>
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl animate-float"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-accent/5 rounded-full blur-3xl animate-float-delayed"></div>
+      </div>
+
+      {/* Enhanced Header with parallax background */}
+      <header className="relative border-b border-border/30 overflow-hidden parallax-bg z-10">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background/50 to-accent/10"></div>
+        <div className="relative container-enhanced py-16">
           <div className="text-center animate-fade-in-up">
-            <div className="flex items-center justify-center gap-4 mb-6">
-              <div className="relative">
-                <Languages className="w-12 h-12 text-primary animate-pulse-glow floating" />
-                <div className="absolute inset-0 w-12 h-12 bg-primary/20 rounded-full blur-xl"></div>
+            {/* Hero Icons with enhanced animations */}
+            <div className="flex items-center justify-center gap-6 mb-8">
+              <div className="relative group">
+                <Languages className="w-16 h-16 text-primary animate-pulse-glow floating" />
+                <div className="absolute inset-0 w-16 h-16 bg-primary/30 rounded-full blur-2xl group-hover:blur-3xl transition-all duration-500"></div>
+                <div className="absolute -inset-2 border border-primary/20 rounded-full animate-pulse"></div>
               </div>
-              <h1 className="text-5xl md:text-6xl font-bold text-gradient">
-                مترجم زیرنویس ASS
-              </h1>
               <div className="relative">
-                <Sparkles className="w-12 h-12 text-accent animate-pulse-glow floating" style={{ animationDelay: '2s' }} />
-                <div className="absolute inset-0 w-12 h-12 bg-accent/20 rounded-full blur-xl"></div>
+                <h1 className="text-6xl md:text-7xl font-bold text-gradient bg-size-200 animate-gradient-shift">
+                  مترجم زیرنویس ASS
+                </h1>
+              </div>
+              <div className="relative group">
+                <Sparkles className="w-16 h-16 text-accent animate-pulse-glow floating-delayed" />
+                <div className="absolute inset-0 w-16 h-16 bg-accent/30 rounded-full blur-2xl group-hover:blur-3xl transition-all duration-500"></div>
+                <div className="absolute -inset-2 border border-accent/20 rounded-full animate-pulse"></div>
               </div>
             </div>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed animate-fade-in-up animate-stagger-1">
-              ترجمه حرفه‌ای زیرنویس‌های ASS به فارسی با تکنولوژی هوش مصنوعی پیشرفته
-            </p>
             
-            {/* Feature badges */}
-            <div className="flex flex-wrap justify-center gap-3 mt-8 animate-fade-in-up animate-stagger-2">
-              <div className="flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full border border-primary/20">
-                <Zap className="w-4 h-4" />
-                <span className="text-sm font-medium">سریع و دقیق</span>
-              </div>
-              <div className="flex items-center gap-2 bg-accent/10 text-accent px-4 py-2 rounded-full border border-accent/20">
-                <Shield className="w-4 h-4" />
-                <span className="text-sm font-medium">امن و مطمئن</span>
-              </div>
-              <div className="flex items-center gap-2 bg-secondary/10 text-secondary-foreground px-4 py-2 rounded-full border border-secondary/20">
-                <Cpu className="w-4 h-4" />
-                <span className="text-sm font-medium">هوش مصنوعی</span>
-              </div>
+            {/* Enhanced subtitle with typewriter effect */}
+            <div className="relative mb-10">
+              <p className="text-2xl text-muted-foreground max-w-4xl mx-auto leading-relaxed animate-fade-in-up animate-stagger-1">
+                ترجمه حرفه‌ای زیرنویس‌های ASS به فارسی با تکنولوژی هوش مصنوعی پیشرفته
+              </p>
+              <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-24 h-1 bg-gradient-primary rounded-full animate-shimmer"></div>
+            </div>
+            
+            {/* Enhanced feature badges with new animations */}
+            <div className="flex flex-wrap justify-center gap-4 mb-8 animate-fade-in-up animate-stagger-2">
+              {[
+                { icon: Zap, text: "سریع و دقیق", color: "primary" },
+                { icon: Shield, text: "امن و مطمئن", color: "accent" },
+                { icon: Cpu, text: "هوش مصنوعی", color: "secondary" },
+                { icon: Rocket, text: "کیفیت بالا", color: "primary" },
+                { icon: Star, text: "پیشرفته", color: "accent" }
+              ].map((feature, index) => (
+                <div 
+                  key={feature.text}
+                  className={`feature-badge animate-bounce-in text-${feature.color} group cursor-pointer`}
+                  style={{ animationDelay: `${index * 0.1}s` }}
+                >
+                  <feature.icon className="w-5 h-5 group-hover:rotate-12 transition-transform duration-300" />
+                  <span className="text-sm font-medium">{feature.text}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Stats Section */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-12 animate-fade-in-up animate-stagger-3">
+              {[
+                { number: "99%", label: "دقت ترجمه", icon: Award },
+                { number: "24/7", label: "در دسترس", icon: Zap },
+                { number: "∞", label: "پشتیبانی زبان", icon: Languages },
+                { number: "0", label: "نگرانی امنیت", icon: Shield }
+              ].map((stat, index) => (
+                <div 
+                  key={stat.label}
+                  className="text-center p-4 rounded-2xl bg-card/30 backdrop-blur-sm border border-border/20 hover-lift"
+                  style={{ animationDelay: `${index * 0.1}s` }}
+                >
+                  <stat.icon className="w-8 h-8 text-primary mx-auto mb-2" />
+                  <div className="text-3xl font-bold text-foreground mb-1">{stat.number}</div>
+                  <div className="text-sm text-muted-foreground">{stat.label}</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content with enhanced layout */}
-      <main className="container-enhanced py-12">
+      {/* Main Content with enhanced responsive layout */}
+      <main className="relative container-enhanced py-16 z-10">
         <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
           
-          {/* Main Content Area */}
-          <div className="xl:col-span-3 space-y-8">
-            {/* File Upload Section */}
-            <Card className="enhanced-card animate-scale-in">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-2xl font-bold text-foreground flex items-center gap-3">
-                  <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
-                    <Languages className="w-5 h-5 text-primary" />
+          {/* Main Content Area with improved spacing */}
+          <div className="xl:col-span-3 space-y-10">
+            {/* File Upload Section with enhanced design */}
+            <Card className="enhanced-card animate-scale-in hover-lift group">
+              <CardHeader className="pb-6">
+                <CardTitle className="text-3xl font-bold text-foreground flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gradient-primary rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                    <Languages className="w-6 h-6 text-primary-foreground" />
                   </div>
-                  انتخاب فایل زیرنویس
+                  <span className="bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
+                    انتخاب فایل زیرنویس
+                  </span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -265,7 +308,7 @@ const Index = () => {
               </CardContent>
             </Card>
 
-            {/* File Statistics with enhanced design */}
+            {/* File Statistics with enhanced responsive design */}
             <div className="animate-scale-in animate-stagger-1">
               <FileStats 
                 selectedFile={selectedFile} 
@@ -274,18 +317,21 @@ const Index = () => {
               />
             </div>
 
-            {/* Enhanced Translation Button */}
+            {/* Enhanced Translation Button with advanced effects */}
             {selectedFile && !isTranslating && (
-              <div className="animate-slide-in-right animate-stagger-2">
+              <div className="animate-bounce-in animate-stagger-2">
                 <Button 
                   onClick={handleTranslate} 
-                  className="w-full h-16 text-lg gradient-button group relative overflow-hidden"
+                  className="w-full h-20 text-xl gradient-button group relative overflow-hidden shadow-glow-lg"
                 >
-                  <div className="absolute inset-0 bg-white/20 transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
-                  <div className="relative flex items-center justify-center gap-3">
-                    <Languages className="w-6 h-6" />
-                    <span className="font-semibold">شروع ترجمه هوشمند با کیفیت بالا</span>
-                    <Sparkles className="w-5 h-5" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent transform -skew-x-12 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                  <div className="relative flex items-center justify-center gap-4 z-10">
+                    <div className="relative">
+                      <Languages className="w-8 h-8 group-hover:rotate-12 transition-transform duration-300" />
+                      <div className="absolute inset-0 bg-white/30 rounded-full blur-xl group-hover:blur-2xl transition-all duration-300"></div>
+                    </div>
+                    <span className="font-bold tracking-wide">شروع ترجمه هوشمند با کیفیت بالا</span>
+                    <Sparkles className="w-6 h-6 group-hover:scale-125 transition-transform duration-300" />
                   </div>
                 </Button>
               </div>
@@ -305,7 +351,7 @@ const Index = () => {
               />
             </div>
 
-            {/* Translation Preview */}
+            {/* Translation Preview with improved layout */}
             <div className="animate-scale-in animate-stagger-4">
               <TranslationPreview
                 original={selectedFile ? '' : ''} 
@@ -317,46 +363,51 @@ const Index = () => {
             </div>
           </div>
 
-          {/* Enhanced Sidebar */}
-          <div className="xl:col-span-1 space-y-6">
-            {/* Control Panel */}
-            <Card className="enhanced-card animate-slide-in-right">
+          {/* Enhanced Sidebar with improved responsive behavior */}
+          <div className="xl:col-span-1 space-y-8">
+            {/* Control Panel with enhanced design */}
+            <Card className="enhanced-card animate-slide-in-right hover-lift">
               <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-semibold">پنل کنترل</CardTitle>
+                <CardTitle className="text-xl font-bold flex items-center gap-3">
+                  <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
+                    <BarChart3 className="w-5 h-5 text-primary" />
+                  </div>
+                  پنل کنترل
+                </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-4">
                 <Button
                   variant={showQualityReport ? "default" : "outline"}
                   size="sm"
                   onClick={toggleQualityReport}
-                  className="w-full justify-start"
+                  className="w-full justify-start hover-glow group"
                 >
-                  <BarChart3 className="w-4 h-4 mr-2" />
+                  <BarChart3 className="w-4 h-4 mr-2 group-hover:rotate-12 transition-transform duration-300" />
                   گزارش کیفیت
                 </Button>
                 <Button
                   variant={showMemoryManagement ? "default" : "outline"}
                   size="sm"
                   onClick={toggleMemoryManagement}
-                  className="w-full justify-start"
+                  className="w-full justify-start hover-glow group"
                 >
-                  <Brain className="w-4 h-4 mr-2" />
+                  <Brain className="w-4 h-4 mr-2 group-hover:scale-110 transition-transform duration-300" />
                   حافظه ترجمه
                 </Button>
               </CardContent>
             </Card>
 
-            {/* Quality Report */}
+            {/* Quality Report with staggered animation */}
             <div className="animate-slide-in-right animate-stagger-1">
               <QualityReport scores={qualityScores} isVisible={showQualityReport} />
             </div>
 
-            {/* Memory Management */}
+            {/* Memory Management with enhanced visibility */}
             <div className="animate-slide-in-right animate-stagger-2">
               <MemoryManagement isVisible={showMemoryManagement} />
             </div>
 
-            {/* Quality Settings */}
+            {/* Quality Settings with improved spacing */}
             <div className="animate-slide-in-right animate-stagger-3">
               <QualitySettingsPanel 
                 qualitySettings={qualitySettings}
@@ -364,7 +415,7 @@ const Index = () => {
               />
             </div>
 
-            {/* Technical Settings */}
+            {/* Technical Settings with enhanced design */}
             <div className="animate-slide-in-right animate-stagger-4">
               <SettingsPanel 
                 apiKey={settings.apiKey}
@@ -393,27 +444,39 @@ const Index = () => {
               />
             </div>
 
-            {/* Enhanced Features Card */}
-            <Card className="enhanced-card animate-slide-in-right animate-stagger-5">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-primary" />
+            {/* Enhanced Features Card with improved visual hierarchy */}
+            <Card className="enhanced-card animate-slide-in-right animate-stagger-5 hover-lift">
+              <CardHeader className="pb-6">
+                <CardTitle className="text-xl font-bold text-foreground flex items-center gap-3">
+                  <div className="relative">
+                    <Sparkles className="w-6 h-6 text-primary animate-pulse-glow" />
+                    <div className="absolute inset-0 bg-primary/20 rounded-full blur-lg"></div>
+                  </div>
                   ویژگی‌های پیشرفته
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-3 text-sm">
+              <CardContent className="space-y-5">
+                <div className="space-y-4">
                   {[
-                    'حافظه ترجمه هوشمند',
-                    'امتیازدهی کیفیت real-time',
-                    'تشخیص ترجمه‌های مشابه',
-                    'پیش‌نمایش و مقایسه',
-                    'صادرات و وارد کردن حافظه',
-                    'گزارش تفصیلی کیفیت'
+                    { icon: Brain, text: 'حافظه ترجمه هوشمند', color: 'text-primary' },
+                    { icon: BarChart3, text: 'امتیازدهی کیفیت real-time', color: 'text-accent' },
+                    { icon: Zap, text: 'تشخیص ترجمه‌های مشابه', color: 'text-primary' },
+                    { icon: Star, text: 'پیش‌نمایش و مقایسه', color: 'text-accent' },
+                    { icon: Shield, text: 'صادرات و وارد کردن حافظه', color: 'text-primary' },
+                    { icon: Award, text: 'گزارش تفصیلی کیفیت', color: 'text-accent' }
                   ].map((feature, index) => (
-                    <div key={index} className="flex items-center gap-3 p-2 rounded-lg bg-primary/5 border border-primary/10">
-                      <div className="w-2 h-2 bg-primary rounded-full"></div>
-                      <span className="text-muted-foreground">{feature}</span>
+                    <div 
+                      key={index} 
+                      className="flex items-center gap-4 p-3 rounded-xl bg-gradient-to-r from-primary/5 to-accent/5 border border-primary/10 hover:border-primary/20 transition-all duration-300 group cursor-pointer hover-lift"
+                      style={{ animationDelay: `${index * 0.1}s` }}
+                    >
+                      <div className="relative">
+                        <feature.icon className={`w-5 h-5 ${feature.color} group-hover:scale-110 transition-transform duration-300`} />
+                        <div className={`absolute inset-0 ${feature.color.replace('text-', 'bg-')}/20 rounded-full blur-sm group-hover:blur-md transition-all duration-300`}></div>
+                      </div>
+                      <span className="text-muted-foreground group-hover:text-foreground transition-colors duration-300 font-medium">
+                        {feature.text}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -423,19 +486,30 @@ const Index = () => {
         </div>
       </main>
 
-      {/* Enhanced Footer */}
-      <footer className="border-t border-border/30 mt-20">
-        <div className="container-enhanced py-8">
+      {/* Enhanced Footer with better visual design */}
+      <footer className="relative border-t border-border/30 mt-24 z-10">
+        <div className="absolute inset-0 bg-gradient-to-t from-card/50 to-transparent"></div>
+        <div className="relative container-enhanced py-12">
           <div className="text-center">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
-                <Languages className="w-4 h-4 text-primary" />
+            <div className="flex items-center justify-center gap-4 mb-6">
+              <div className="relative group">
+                <div className="w-12 h-12 bg-gradient-primary rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                  <Languages className="w-6 h-6 text-primary-foreground" />
+                </div>
+                <div className="absolute inset-0 bg-primary/20 rounded-2xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
               </div>
-              <span className="text-lg font-semibold text-foreground">مترجم زیرنویس ASS</span>
+              <span className="text-2xl font-bold bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
+                مترجم زیرنویس ASS
+              </span>
             </div>
-            <p className="text-muted-foreground">
+            <p className="text-lg text-muted-foreground mb-4">
               ساخته شده با ❤️ برای ترجمه حرفه‌ای و با کیفیت
             </p>
+            <div className="flex justify-center gap-2 text-sm text-muted-foreground/70">
+              <span>نسخه 2.0</span>
+              <span>•</span>
+              <span>پیشرفته و قدرتمند</span>
+            </div>
           </div>
         </div>
       </footer>
