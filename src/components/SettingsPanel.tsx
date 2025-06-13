@@ -107,16 +107,18 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
         {/* API Settings */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="personal-api" className="text-foreground">
+          <div className="flex items-center justify-between gap-4">
+            <Label htmlFor="personal-api" className="text-foreground flex-1">
               استفاده از API شخصی
             </Label>
-            <Switch
-              id="personal-api"
-              checked={usePersonalApi}
-              onCheckedChange={setUsePersonalApi}
-              className="data-[state=checked]:bg-primary"
-            />
+            <div className="flex-shrink-0">
+              <Switch
+                id="personal-api"
+                checked={usePersonalApi}
+                onCheckedChange={setUsePersonalApi}
+                className="data-[state=checked]:bg-primary"
+              />
+            </div>
           </div>
           
           {usePersonalApi && (
@@ -157,16 +159,18 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           {/* Thinking Mode for Gemini 2.5 Flash */}
           {isThinkingSupported && setEnableThinking && (
             <div className="space-y-2 animate-slide-up">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="thinking-mode" className="text-foreground">
+              <div className="flex items-center justify-between gap-4">
+                <Label htmlFor="thinking-mode" className="text-foreground flex-1">
                   فعال‌سازی حالت تفکر (Thinking Mode)
                 </Label>
-                <Switch
-                  id="thinking-mode"
-                  checked={enableThinking}
-                  onCheckedChange={setEnableThinking}
-                  className="data-[state=checked]:bg-primary"
-                />
+                <div className="flex-shrink-0">
+                  <Switch
+                    id="thinking-mode"
+                    checked={enableThinking}
+                    onCheckedChange={setEnableThinking}
+                    className="data-[state=checked]:bg-primary"
+                  />
+                </div>
               </div>
               <p className="text-xs text-muted-foreground">
                 حالت تفکر باعث تحلیل عمیق‌تر و دقت بالاتر در ترجمه می‌شود ولی زمان بیشتری طول می‌کشد
