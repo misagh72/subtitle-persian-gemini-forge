@@ -1,8 +1,8 @@
-
 import { useState, useCallback } from 'react';
 import { TranslationSettings, TranslationStatus } from '@/utils/translator';
 import { TranslationQualitySettings } from '@/utils/translationQuality';
 import { QualityScore } from '@/utils/translationMemory';
+import { TranslationMemory } from '@/utils/translationMemory';
 
 export interface TranslationState {
   selectedFile: File | null;
@@ -88,6 +88,16 @@ export const useTranslationState = () => {
     }));
   }, []);
 
+  // function to clear translation memory
+  const clearTranslationMemory = useCallback(() => {
+    TranslationMemory.clearMemory();
+  }, []);
+
+  // memory count function
+  const getMemoryCount = useCallback(() => {
+    return TranslationMemory.getMemory().length;
+  }, []);
+
   return {
     ...state,
     updateState,
@@ -95,7 +105,9 @@ export const useTranslationState = () => {
     setSelectedFile,
     addQualityScores,
     toggleQualityReport,
-    toggleMemoryManagement
+    toggleMemoryManagement,
+    clearTranslationMemory,
+    getMemoryCount,
   };
 };
 
