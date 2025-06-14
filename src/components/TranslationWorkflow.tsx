@@ -1,12 +1,11 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import FileStats from '@/components/FileStats';
 import TranslationProgress from '@/components/TranslationProgress';
 import TranslationPreview from '@/components/TranslationPreview';
 import { AssParser } from '@/utils/assParser';
 import { EnhancedGeminiTranslatorV2 } from '@/utils/enhancedTranslatorV2';
-import { cleanPersianTranslation } from '@/utils/postProcessPersian';
+import { TranslationErrorHandler } from '@/utils/errorHandler';
 import { useToast } from '@/hooks/use-toast';
 
 interface TranslationWorkflowProps {
@@ -115,24 +114,25 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
         description: `${uniqueDialogueTexts.length} خط متن برای ترجمه یافت شد`
       });
 
-      // Enhanced settings for better API handling
+      // Enhanced settings with validation
       const enhancedSettings = {
         ...settings,
         qualitySettings,
-        enablePatternDetection: false, // Disable for performance
+        // Optimize for performance
+        enablePatternDetection: false,
         enableGrammarCheck: false,     
         enableSentimentAnalysis: false, 
         enableCoherenceCheck: false,   
         enableThinking: false,         
-        temperature: settings.temperature || 0.4,
-        numberOfChunks: Math.min(settings.numberOfChunks || 3, 5), // Limit chunks
-        maxRetries: 2, // Reduce retries
+        temperature: Math.max(0.1, Math.min(settings.temperature || 0.4, 1.0)),
+        numberOfChunks: Math.min(settings.numberOfChunks || 3, 5),
+        maxRetries: 2,
       };
 
-      console.log('🎛️ Enhanced settings prepared:', enhancedSettings);
+      console.log('🎛️ Enhanced settings prepared');
       console.log('🌐 Starting translation API call...');
       
-      const translations: Map<string, string> = await EnhancedGeminiTranslatorV2.translateTexts(
+      const translations = await EnhancedGeminiTranslatorV2.translateTexts(
         uniqueDialogueTexts,
         enhancedSettings,
         (newStatus) => {
@@ -150,15 +150,8 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
       );
 
       console.log('✨ Translation completed, processing results...');
-
-      // Clean up resulting translations
-      const cleanedTranslations = new Map<string, string>();
-      translations.forEach((persian, orig) => {
-        cleanedTranslations.set(orig, cleanPersianTranslation(persian));
-      });
-
       console.log('🔧 Reconstructing ASS file...');
-      const translatedAssContent = AssParser.reconstructAssFile(parsedLines, cleanedTranslations);
+      const translatedAssContent = AssParser.reconstructAssFile(parsedLines, translations);
 
       console.log('🎉 Translation process completed successfully');
 
@@ -174,20 +167,8 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
       
     } catch (err) {
       console.error('❌ Translation error:', err);
-      let errorMessage = 'خطای نامشخص در ترجمه';
-      
-      if (err instanceof Error) {
-        errorMessage = err.message;
-        
-        // Provide more helpful error messages
-        if (err.message.includes('Failed to fetch') || err.message.includes('Network')) {
-          errorMessage = 'خطای اتصال به اینترنت - لطفا اتصال خود را بررسی کنید';
-        } else if (err.message.includes('quota') || err.message.includes('429')) {
-          errorMessage = 'محدودیت API - لطفا چند دقیقه صبر کنید و دوباره تلاش کنید';
-        } else if (err.message.includes('403') || err.message.includes('unauthorized')) {
-          errorMessage = 'کلید API نامعتبر - لطفا کلید صحیح وارد کنید';
-        }
-      }
+      const normalizedError = TranslationErrorHandler.normalizeError(err);
+      const errorMessage = TranslationErrorHandler.getErrorMessage(normalizedError);
       
       updateState({ error: errorMessage });
       toast({

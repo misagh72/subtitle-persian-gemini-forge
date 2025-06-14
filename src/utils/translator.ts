@@ -31,7 +31,6 @@ export class GeminiTranslator {
     onProgress?: (status: TranslationStatus) => void,
     onStatusUpdate?: (message: string) => void
   ): Promise<Map<string, string>> {
-    // Create new abort controller for this translation
     this.abortController = new AbortController();
     
     const translations = new Map<string, string>();
@@ -43,7 +42,6 @@ export class GeminiTranslator {
     onStatusUpdate?.('شروع ترجمه...');
     
     for (let i = 0; i < totalTexts; i += chunkSize) {
-      // Check if translation was cancelled
       if (this.abortController.signal.aborted) {
         throw new Error('ترجمه توسط کاربر متوقف شد');
       }
@@ -75,7 +73,7 @@ export class GeminiTranslator {
           
           const progress = Math.min(((i + chunkSize) / totalTexts) * 100, 100);
           const elapsedTime = Date.now() - startTime;
-          const estimatedTotal = (elapsedTime / progress) * 100;
+          const estimatedTotal = progress > 0 ? (elapsedTime / progress) * 100 : elapsedTime;
           const estimatedTimeRemaining = Math.max(0, estimatedTotal - elapsedTime);
           
           onProgress?.({
@@ -111,13 +109,11 @@ export class GeminiTranslator {
             await new Promise(resolve => setTimeout(resolve, 2000));
           } else {
             onStatusUpdate?.(`خطا در ترجمه بخش ${currentChunk}: ${error instanceof Error ? error.message : 'خطای نامشخص'}`);
-            // Continue with next batch instead of failing completely
             break;
           }
         }
       }
       
-      // Apply base delay between successful batches
       if (batchSuccess && i + chunkSize < totalTexts && !this.abortController.signal.aborted) {
         await new Promise(resolve => setTimeout(resolve, settings.baseDelay));
       }
