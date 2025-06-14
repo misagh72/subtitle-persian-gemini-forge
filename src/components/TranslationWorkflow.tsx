@@ -151,12 +151,12 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
       );
 
       // Add timeout to prevent hanging
-      const timeoutPromise = new Promise((_, reject) => {
+      const timeoutPromise = new Promise<Map<string, string>>((_, reject) => {
         setTimeout(() => reject(new Error('ترجمه به دلیل طولانی شدن متوقف شد')), 120000); // 2 minutes
       });
 
       console.log('⏰ Starting translation with 2-minute timeout...');
-      const translations = await Promise.race([translationPromise, timeoutPromise]);
+      const translations: Map<string, string> = await Promise.race([translationPromise, timeoutPromise]);
 
       console.log('✨ Translation completed, processing results...');
 
