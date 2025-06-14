@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -6,10 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { CheckCircle, AlertTriangle, TrendingUp, Brain, Heart, Target, Repeat } from 'lucide-react';
-import { AdvancedQualityReport } from '@/utils/enhancedTranslatorV2';
+import type { AdvancedQualityReport as AdvancedQualityReportType } from '@/utils/enhancedTranslatorV2';
 
 interface AdvancedQualityReportProps {
-  report: AdvancedQualityReport | null;
+  report: AdvancedQualityReportType | null;
   isVisible: boolean;
   onClose: () => void;
 }
