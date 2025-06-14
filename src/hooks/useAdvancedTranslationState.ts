@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from 'react';
 import { TranslationSettings, TranslationStatus } from '@/utils/translator';
 import { TranslationQualitySettings } from '@/utils/translationQuality';
@@ -140,7 +139,8 @@ export const useAdvancedSettingsState = () => {
     enablePatternDetection: true,
     enableGrammarCheck: true,
     enableSentimentAnalysis: true,
-    enableCoherenceCheck: true
+    enableCoherenceCheck: true,
+    usePersonalApi: false
   });
 
   const updateSettings = useCallback((updates: Partial<AdvancedTranslationSettings>) => {
