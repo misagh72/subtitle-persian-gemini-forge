@@ -40,31 +40,21 @@ export class EnhancedGeminiTranslatorV2 {
     const translations = new Map<string, string>();
     const qualityScores: QualityScore[] = [];
     const totalTexts = texts.length;
-    const chunkSize = Math.max(1, Math.ceil(totalTexts / settings.numberOfChunks));
-    const maxRetries = Math.max(1, Math.min(settings.maxRetries || 3, 3)); // Limit retries
+    const chunkSize = Math.max(1, Math.ceil(totalTexts / Math.min(settings.numberOfChunks, 5))); // Limit chunks to 5
+    const maxRetries = 2; // Reduce retries
     const startTime = Date.now();
     
     console.log(`📊 Processing ${totalTexts} texts in ${Math.ceil(totalTexts / chunkSize)} chunks`);
     
-    // Simplified pattern detection
-    let recurringPatterns: RecurringPattern[] = [];
-    if (settings.enablePatternDetection) {
-      try {
-        onStatusUpdate?.('تشخیص الگوهای مکرر...');
-        recurringPatterns = AdvancedQualityService.detectRecurringPatterns(texts);
-        console.log(`✅ Found ${recurringPatterns.length} recurring patterns`);
-      } catch (error) {
-        console.warn('⚠️ Pattern detection failed:', error);
-        recurringPatterns = [];
-      }
-    }
+    // Skip pattern detection for faster processing
+    const recurringPatterns: RecurringPattern[] = [];
     
     // Pre-process texts
     const cleanedTexts = texts.map(text => TranslationQualityService.cleanText(text));
     
-    onStatusUpdate?.('شروع ترجمه با تحلیل پیشرفته...');
+    onStatusUpdate?.('شروع ترجمه...');
     
-    // Process in chunks with error handling
+    // Process in smaller chunks with better error handling
     for (let i = 0; i < totalTexts; i += chunkSize) {
       if (this.abortController.signal.aborted) {
         console.log('🛑 Translation cancelled by user');
@@ -104,7 +94,7 @@ export class EnhancedGeminiTranslatorV2 {
         console.log(`📚 Used memory translation for: "${original.substring(0, 30)}..."`);
       });
       
-      // Translate remaining texts with retry logic
+      // Translate remaining texts with improved error handling
       if (needsTranslation.length > 0) {
         let retryCount = 0;
         let batchSuccess = false;
@@ -119,12 +109,21 @@ export class EnhancedGeminiTranslatorV2 {
               recurringPatterns
             );
             
+            // Create a fresh AbortController for each request to avoid issues
+            const requestAbortController = new AbortController();
+            
+            // Timeout for individual request (30 seconds)
+            const timeoutId = setTimeout(() => {
+              requestAbortController.abort();
+            }, 30000);
+            
             const batchTranslations = await this.translateBatch(
               enhancedPrompt, 
               settings, 
-              this.abortController.signal
+              requestAbortController.signal
             );
             
+            clearTimeout(timeoutId);
             console.log(`✅ Received ${batchTranslations.length} translations from API`);
             
             // Process and store translations
@@ -172,14 +171,27 @@ export class EnhancedGeminiTranslatorV2 {
               throw new Error('ترجمه توسط کاربر متوقف شد');
             }
             
+            // Better error handling for different types of errors
+            const isNetworkError = error instanceof Error && (
+              error.message.includes('Failed to fetch') ||
+              error.message.includes('Network') ||
+              error.name === 'AbortError'
+            );
+            
             const isQuotaError = error instanceof Error && (
               error.message.includes('quota') || 
               error.message.includes('rate') ||
               error.message.includes('429')
             );
             
-            if (isQuotaError && retryCount <= maxRetries) {
-              const delayTime = Math.min(settings.quotaDelay || 5000, 10000); // Max 10 seconds
+            if (isNetworkError) {
+              console.warn('🌐 Network error detected');
+              onStatusUpdate?.(`خطای شبکه - تلاش ${retryCount} از ${maxRetries}...`);
+              if (retryCount <= maxRetries) {
+                await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds for network issues
+              }
+            } else if (isQuotaError && retryCount <= maxRetries) {
+              const delayTime = 5000; // 5 seconds for quota issues
               onStatusUpdate?.(`محدودیت API، انتظار ${delayTime / 1000} ثانیه...`);
               await new Promise(resolve => setTimeout(resolve, delayTime));
             } else if (retryCount <= maxRetries) {
@@ -187,18 +199,18 @@ export class EnhancedGeminiTranslatorV2 {
               await new Promise(resolve => setTimeout(resolve, 2000));
             } else {
               console.error(`💥 Max retries exceeded for chunk ${currentChunk}`);
-              onStatusUpdate?.(`خطا در ترجمه بخش ${currentChunk}: ${error instanceof Error ? error.message : 'خطای نامشخص'}`);
+              // Don't throw error, just log and continue with next chunk
+              onStatusUpdate?.(`خطا در ترجمه بخش ${currentChunk}, ادامه با بخش بعدی...`);
               break;
             }
           }
         }
       }
       
-      // Delay between chunks (but not after the last one)
+      // Smaller delay between chunks
       if (i + chunkSize < totalTexts && !this.abortController.signal.aborted) {
-        const delayTime = Math.min(settings.baseDelay || 1000, 3000); // Max 3 seconds
-        console.log(`⏱️ Waiting ${delayTime}ms before next chunk...`);
-        await new Promise(resolve => setTimeout(resolve, delayTime));
+        console.log(`⏱️ Waiting 1 second before next chunk...`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
     
@@ -222,7 +234,7 @@ export class EnhancedGeminiTranslatorV2 {
     
     // Add pattern instructions if available
     if (patterns.length > 0) {
-      const patternInstructions = patterns.slice(0, 5).map(p => // Limit to 5 patterns
+      const patternInstructions = patterns.slice(0, 3).map(p => // Limit to 3 patterns
         `"${p.pattern}" → "${p.preferredTranslation}"`
       ).join('\n');
       
@@ -237,6 +249,13 @@ export class EnhancedGeminiTranslatorV2 {
     settings: AdvancedTranslationSettings,
     signal: AbortSignal
   ): Promise<string[]> {
+    // Validate API key
+    const apiKey = settings.usePersonalApi ? settings.apiKey : 'AIzaSyBvZwZQ_Qy9r8vK7NxY2mL4jP6wX3oE8tA';
+    
+    if (!apiKey || apiKey.trim() === '') {
+      throw new Error('کلید API یافت نشد');
+    }
+
     const requestBody: any = {
       contents: [{
         parts: [{ text: prompt }]
@@ -249,31 +268,54 @@ export class EnhancedGeminiTranslatorV2 {
       }
     };
 
-    const apiKey = settings.apiKey || 'AIzaSyBvZwZQ_Qy9r8vK7NxY2mL4jP6wX3oE8tA';
     const model = settings.geminiModel || 'gemini-2.0-flash-exp';
+    const url = `${this.DEFAULT_API_ENDPOINT}/${model}:generateContent?key=${apiKey}`;
     
     console.log(`🌐 Making API request to ${model}...`);
     
-    const response = await fetch(`${this.DEFAULT_API_ENDPOINT}/${model}:generateContent?key=${apiKey}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody),
-      signal
-    });
+    // Add fetch with better error handling
+    let response: Response;
+    
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+        signal
+      });
+    } catch (fetchError) {
+      console.error('❌ Network fetch error:', fetchError);
+      if (fetchError instanceof Error) {
+        if (fetchError.name === 'AbortError') {
+          throw new Error('درخواست لغو شد');
+        }
+        throw new Error(`خطای شبکه: ${fetchError.message}`);
+      }
+      throw new Error('خطای شبکه نامشخص');
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`❌ API Error: ${response.status} ${response.statusText}`, errorText);
-      throw new Error(`خطای API ترجمه: ${response.status} ${response.statusText}`);
+      
+      if (response.status === 429) {
+        throw new Error('محدودیت نرخ API - لطفا چند لحظه صبر کنید');
+      } else if (response.status === 403) {
+        throw new Error('دسترسی غیرمجاز - کلید API را بررسی کنید');
+      } else if (response.status >= 500) {
+        throw new Error('خطای سرور Google - لطفا بعدا تلاش کنید');
+      }
+      
+      throw new Error(`خطای API: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
     
     if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
       console.error('❌ Invalid API response format:', data);
-      throw new Error('فرمت پاسخ نامعتبر از API ترجمه');
+      throw new Error('فرمت پاسخ نامعتبر از API');
     }
 
     const translatedText = data.candidates[0].content.parts[0].text;

@@ -65,7 +65,8 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
       return;
     }
     
-    if (settings.usePersonalApi && !settings.apiKey.trim()) {
+    // Validate API key if using personal API
+    if (settings.usePersonalApi && (!settings.apiKey || settings.apiKey.trim() === '')) {
       toast({
         title: "خطا",
         description: "لطفاً کلید API خود را وارد کنید",
@@ -100,7 +101,7 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
 
       console.log(`📊 Found ${dialogueLines.length} dialogue lines`);
 
-      // Simplify - just get unique texts without complex context
+      // Get unique texts for translation
       const uniqueDialogueTexts = Array.from(new Set(dialogueLines.map(line => line.text!)));
       
       if (uniqueDialogueTexts.length === 0) {
@@ -114,26 +115,24 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
         description: `${uniqueDialogueTexts.length} خط متن برای ترجمه یافت شد`
       });
 
-      // Simplified settings for debugging
+      // Enhanced settings for better API handling
       const enhancedSettings = {
         ...settings,
         qualitySettings,
-        enablePatternDetection: false, // Disable for now
-        enableGrammarCheck: false,     // Disable for now
-        enableSentimentAnalysis: false, // Disable for now
-        enableCoherenceCheck: false,   // Disable for now
-        enableThinking: false,         // Disable for now
-        temperature: 0.4,
-        numberOfChunks: 2,             // Reduce chunks
-        maxRetries: 2,                 // Reduce retries
+        enablePatternDetection: false, // Disable for performance
+        enableGrammarCheck: false,     
+        enableSentimentAnalysis: false, 
+        enableCoherenceCheck: false,   
+        enableThinking: false,         
+        temperature: settings.temperature || 0.4,
+        numberOfChunks: Math.min(settings.numberOfChunks || 3, 5), // Limit chunks
+        maxRetries: 2, // Reduce retries
       };
 
       console.log('🎛️ Enhanced settings prepared:', enhancedSettings);
-
       console.log('🌐 Starting translation API call...');
       
-      // Use simplified translator call with timeout
-      const translationPromise = EnhancedGeminiTranslatorV2.translateTexts(
+      const translations: Map<string, string> = await EnhancedGeminiTranslatorV2.translateTexts(
         uniqueDialogueTexts,
         enhancedSettings,
         (newStatus) => {
@@ -149,14 +148,6 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
           addQualityScores(scores);
         }
       );
-
-      // Add timeout to prevent hanging
-      const timeoutPromise = new Promise<Map<string, string>>((_, reject) => {
-        setTimeout(() => reject(new Error('ترجمه به دلیل طولانی شدن متوقف شد')), 120000); // 2 minutes
-      });
-
-      console.log('⏰ Starting translation with 2-minute timeout...');
-      const translations: Map<string, string> = await Promise.race([translationPromise, timeoutPromise]);
 
       console.log('✨ Translation completed, processing results...');
 
@@ -183,7 +174,21 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
       
     } catch (err) {
       console.error('❌ Translation error:', err);
-      const errorMessage = err instanceof Error ? err.message : 'خطای نامشخص در ترجمه';
+      let errorMessage = 'خطای نامشخص در ترجمه';
+      
+      if (err instanceof Error) {
+        errorMessage = err.message;
+        
+        // Provide more helpful error messages
+        if (err.message.includes('Failed to fetch') || err.message.includes('Network')) {
+          errorMessage = 'خطای اتصال به اینترنت - لطفا اتصال خود را بررسی کنید';
+        } else if (err.message.includes('quota') || err.message.includes('429')) {
+          errorMessage = 'محدودیت API - لطفا چند دقیقه صبر کنید و دوباره تلاش کنید';
+        } else if (err.message.includes('403') || err.message.includes('unauthorized')) {
+          errorMessage = 'کلید API نامعتبر - لطفا کلید صحیح وارد کنید';
+        }
+      }
+      
       updateState({ error: errorMessage });
       toast({
         title: "خطا در ترجمه",
