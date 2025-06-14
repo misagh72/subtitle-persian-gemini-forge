@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -6,7 +5,8 @@ import FileStats from '@/components/FileStats';
 import TranslationProgress from '@/components/TranslationProgress';
 import TranslationPreview from '@/components/TranslationPreview';
 import { AssParser } from '@/utils/assParser';
-import { EnhancedGeminiTranslator } from '@/utils/enhancedTranslator';
+import { EnhancedGeminiTranslatorV2 } from '@/utils/enhancedTranslatorV2';
+import { cleanPersianTranslation } from '@/utils/postProcessPersian';
 import { useToast } from '@/hooks/use-toast';
 
 interface TranslationWorkflowProps {
@@ -50,7 +50,6 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
         });
       }).catch(console.error);
     }
-    // Only when file changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFile]);
 
@@ -87,39 +86,66 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
     try {
       const fileContent = await selectedFile.text();
       const parsedLines = AssParser.parseAssFile(fileContent);
-      const dialogueTexts = parsedLines
-        .filter(line => line.type === 'dialogue' && line.text && line.text.trim())
-        .map(line => line.text!)
-        .filter((text, index, array) => array.indexOf(text) === index);
+      const dialogueLines = parsedLines.filter(line => line.type === 'dialogue' && line.text && line.text.trim());
 
-      if (dialogueTexts.length === 0) {
+      // Gather context for each dialogue
+      const dialogueTextsWithContext = dialogueLines.map((line, idx, arr) => {
+        const prev = arr[idx - 1]?.text || '';
+        const next = arr[idx + 1]?.text || '';
+        return {
+          text: line.text!,
+          context: [prev, line.text!, next].filter(Boolean).join('\n')
+        };
+      });
+
+      // Only line.text for unique mapping, but pass context to translator
+      const uniqueDialogueTexts = Array.from(new Set(dialogueTextsWithContext.map(d => d.text)));
+      if (uniqueDialogueTexts.length === 0) {
         throw new Error('هیچ متن قابل ترجمه‌ای در فایل یافت نشد');
       }
       toast({
-        title: "شروع ترجمه با سیستم هوشمند",
-        description: `${dialogueTexts.length} خط متن برای ترجمه یافت شد`
+        title: "شروع ترجمه پیشرفته",
+        description: `${uniqueDialogueTexts.length} خط متن برای ترجمه یافت شد`
       });
+
+      // Prepare advanced settings with best quality options
       const enhancedSettings = {
         ...settings,
-        qualitySettings
+        qualitySettings,
+        enablePatternDetection: true,
+        enableGrammarCheck: true,
+        enableSentimentAnalysis: true,
+        enableCoherenceCheck: true,
+        enableThinking: true,
+        temperature: 0.4,
+        numberOfChunks: 3,
+        maxRetries: 5,
       };
-      const translations = await EnhancedGeminiTranslator.translateTexts(
-        dialogueTexts, 
+
+      // Use new Enhanced V2 Translator with context support and reporting hooks
+      const translations = await EnhancedGeminiTranslatorV2.translateTexts(
+        uniqueDialogueTexts,
         enhancedSettings,
-        newStatus => updateState({ status: newStatus }),
-        message => updateState({ statusMessage: message }),
-        scores => addQualityScores(scores)
+        (newStatus) => updateState({ status: newStatus }),
+        (message) => updateState({ statusMessage: message }),
+        (scores) => addQualityScores(scores),
+        { dialogueContexts: dialogueTextsWithContext }
       );
-      const translatedAssContent = AssParser.reconstructAssFile(parsedLines, translations);
+
+      // Clean up resulting translations with Persian-focused post-processing
+      const cleanedTranslations = new Map<string, string>();
+      translations.forEach((persian, orig) => {
+        cleanedTranslations.set(orig, cleanPersianTranslation(persian));
+      });
+
+      const translatedAssContent = AssParser.reconstructAssFile(parsedLines, cleanedTranslations);
+
       updateState({
         translatedContent: translatedAssContent,
-        status: {
-          ...status,
-          progress: 100
-        }
+        status: { ...status, progress: 100 }
       });
       toast({
-        title: "ترجمه با کیفیت بالا تکمیل شد",
+        title: "ترجمه پیشرفته و باکیفیت تکمیل شد",
         description: `${translations.size} خط با موفقیت ترجمه شد`
       });
     } catch (err) {
@@ -155,7 +181,7 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
   };
 
   const handleCancelTranslation = () => {
-    EnhancedGeminiTranslator.cancelTranslation();
+    EnhancedGeminiTranslatorV2.cancelTranslation();
     updateState({
       isTranslating: false,
       statusMessage: 'ترجمه توسط کاربر متوقف شد'

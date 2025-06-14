@@ -1,4 +1,3 @@
-
 export interface TranslationQualitySettings {
   genre: 'movie' | 'series' | 'documentary' | 'animation' | 'comedy' | 'drama' | 'action';
   formalityLevel: 'formal' | 'informal' | 'neutral';
@@ -17,37 +16,46 @@ export interface QualityMetrics {
 
 export class TranslationQualityService {
   static createEnhancedPrompt(texts: string[], settings: TranslationQualitySettings): string {
+    // Prompt with explicit subtitle and context-aware instructions and examples
     const genreContext = this.getGenreContext(settings.genre);
     const formalityInstructions = this.getFormalityInstructions(settings.formalityLevel);
     const preserveNamesInstructions = settings.preserveNames ? this.getNamePreservationInstructions() : '';
-    
+    const examples = `
+    **چند مثال ترجمه زیرنویس حرفه‌ای:**
+    1. Original: How are you doing?
+       ترجمه: حالت چطوره؟
+    2. Original: I'm not sure about this.
+       ترجمه: مطمئن نیستم از این کار.
+    3. Original: Let's get out of here!
+       ترجمه: بیا بریم از اینجا!
+    4. Original: What did you say?
+       ترجمه: چی گفتی؟
+    `;
+
     const textList = texts.map((text, index) => `${index + 1}. ${text}`).join('\n');
-    
-    return `شما یک مترجم حرفه‌ای زیرنویس هستید. لطفاً متن‌های زیر را از هر زبانی که هستند به فارسی ترجمه کنید.
+
+    return `شما یک مترجم بسیار حرفه‌ای زیرنویس فیلم هستید و باید جملات کوتاه و طبیعی و دقیق ارائه دهید. لطفاً جملات زیر را از هر زبانی به فارسی ترجمه کنید.
 
 **مشخصات پروژه:**
 - نوع محتوا: ${genreContext}
 - سطح رسمیت: ${formalityInstructions}
 ${preserveNamesInstructions}
 
-**قوانین مهم ترجمه:**
-1. ترجمه باید طبیعی، روان و مناسب برای زیرنویس باشد
-2. از کلمات ساده و قابل فهم استفاده کنید
-3. طول ترجمه نباید بیش از 20% از متن اصلی تفاوت داشته باشد
-4. در صورت وجود اصطلاحات خاص، معادل فارسی مناسب استفاده کنید
-5. حالت و احساس متن اصلی را حفظ کنید
-6. از نوشتن توضیحات اضافی خودداری کنید
+**قوانین لازم:**
+1. ترجمه باید بسیار طبیعی، روان و مختصر (مانند زیرنویس حرفه‌ای فیلم و سریال ایرانی) باشد
+2. طول ترجمه از متن اصلی نباید بیشتر از ۲۰٪ بیشتر یا کمتر باشد
+3. اسم افراد، مکان‌ها، برندها و اصطلاحات خاص را تغییر ندهید
+4. از گفتار روزمره و عامیانه مناسب با موقعیت استفاده کنید
+5. سبک و حس جملات اصلی را حفظ کنید (طنز، عصبانیت، جدیت و ...)
+6. توضیح اضافه ننویسید و فقط خود ترجمه هر جمله را به همان ترتیب ارائه دهید 
 
-**متن‌های مورد نظر:**
+${examples}
+
+**متون مورد نظر:**
 ${textList}
 
 **فرمت پاسخ:**
-لطفاً پاسخ خود را دقیقاً به همین فرمت ارائه دهید:
-1. [ترجمه فارسی متن اول]
-2. [ترجمه فارسی متن دوم]
-...
-
-فقط ترجمه را بنویسید، توضیح اضافی ندهید.`;
+فقط ترجمه فارسی هر جمله، به همان شماره و ترتیب؛ بدون هیچ توضیح اضافی!`;
   }
 
   private static getGenreContext(genre: string): string {
@@ -81,16 +89,16 @@ ${textList}
   }
 
   static cleanText(text: string): string {
+    // Use new post-processing util for improved cleaning:
+    // (existing logic will remain for backward compatibility)
+    // This will be used in post-translate step as well.
+    // usage in components: import { cleanPersianTranslation } from './postProcessPersian'
     return text
       .trim()
-      // Remove extra whitespace
       .replace(/\s+/g, ' ')
-      // Fix Persian/Arabic characters
       .replace(/ي/g, 'ی')
       .replace(/ك/g, 'ک')
-      // Remove unwanted characters that might interfere with subtitle formatting
       .replace(/[^\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF\u200C\u200D\s\w\d\p{P}]/gu, '')
-      // Normalize punctuation
       .replace(/\.{2,}/g, '...')
       .replace(/\?{2,}/g, '?')
       .replace(/!{2,}/g, '!');
