@@ -54,6 +54,8 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
   }, [selectedFile]);
 
   const handleTranslate = async () => {
+    console.log('🚀 Translation started');
+    
     if (!selectedFile) {
       toast({
         title: "خطا",
@@ -62,6 +64,7 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
       });
       return;
     }
+    
     if (settings.usePersonalApi && !settings.apiKey.trim()) {
       toast({
         title: "خطا",
@@ -70,6 +73,9 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
       });
       return;
     }
+
+    console.log('✅ Initial validation passed');
+    
     updateState({
       isTranslating: true,
       error: null,
@@ -83,71 +89,100 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
         totalTexts: 0
       }
     });
+
     try {
+      console.log('📖 Reading file content...');
       const fileContent = await selectedFile.text();
+      
+      console.log('📝 Parsing ASS file...');
       const parsedLines = AssParser.parseAssFile(fileContent);
       const dialogueLines = parsedLines.filter(line => line.type === 'dialogue' && line.text && line.text.trim());
 
-      // Gather context for each dialogue
-      const dialogueTextsWithContext = dialogueLines.map((line, idx, arr) => {
-        const prev = arr[idx - 1]?.text || '';
-        const next = arr[idx + 1]?.text || '';
-        return {
-          text: line.text!,
-          context: [prev, line.text!, next].filter(Boolean).join('\n')
-        };
-      });
+      console.log(`📊 Found ${dialogueLines.length} dialogue lines`);
 
-      // Only line.text for unique mapping, but pass context to translator
-      const uniqueDialogueTexts = Array.from(new Set(dialogueTextsWithContext.map(d => d.text)));
+      // Simplify - just get unique texts without complex context
+      const uniqueDialogueTexts = Array.from(new Set(dialogueLines.map(line => line.text!)));
+      
       if (uniqueDialogueTexts.length === 0) {
         throw new Error('هیچ متن قابل ترجمه‌ای در فایل یافت نشد');
       }
+
+      console.log(`🔤 Found ${uniqueDialogueTexts.length} unique texts to translate`);
+
       toast({
-        title: "شروع ترجمه پیشرفته",
+        title: "شروع ترجمه",
         description: `${uniqueDialogueTexts.length} خط متن برای ترجمه یافت شد`
       });
 
-      // Prepare advanced settings with best quality options
+      // Simplified settings for debugging
       const enhancedSettings = {
         ...settings,
         qualitySettings,
-        enablePatternDetection: true,
-        enableGrammarCheck: true,
-        enableSentimentAnalysis: true,
-        enableCoherenceCheck: true,
-        enableThinking: true,
+        enablePatternDetection: false, // Disable for now
+        enableGrammarCheck: false,     // Disable for now
+        enableSentimentAnalysis: false, // Disable for now
+        enableCoherenceCheck: false,   // Disable for now
+        enableThinking: false,         // Disable for now
         temperature: 0.4,
-        numberOfChunks: 3,
-        maxRetries: 5,
+        numberOfChunks: 2,             // Reduce chunks
+        maxRetries: 2,                 // Reduce retries
       };
 
-      // Use new Enhanced V2 Translator with context support and reporting hooks
-      const translations = await EnhancedGeminiTranslatorV2.translateTexts(
+      console.log('🎛️ Enhanced settings prepared:', enhancedSettings);
+
+      console.log('🌐 Starting translation API call...');
+      
+      // Use simplified translator call with timeout
+      const translationPromise = EnhancedGeminiTranslatorV2.translateTexts(
         uniqueDialogueTexts,
         enhancedSettings,
-        (newStatus) => updateState({ status: newStatus }),
-        (message) => updateState({ statusMessage: message }),
-        (scores) => addQualityScores(scores)
+        (newStatus) => {
+          console.log('📈 Status update:', newStatus);
+          updateState({ status: newStatus });
+        },
+        (message) => {
+          console.log('💬 Status message:', message);
+          updateState({ statusMessage: message });
+        },
+        (scores) => {
+          console.log('⭐ Quality scores:', scores);
+          addQualityScores(scores);
+        }
       );
 
-      // Clean up resulting translations with Persian-focused post-processing
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('ترجمه به دلیل طولانی شدن متوقف شد')), 120000); // 2 minutes
+      });
+
+      console.log('⏰ Starting translation with 2-minute timeout...');
+      const translations = await Promise.race([translationPromise, timeoutPromise]);
+
+      console.log('✨ Translation completed, processing results...');
+
+      // Clean up resulting translations
       const cleanedTranslations = new Map<string, string>();
       translations.forEach((persian, orig) => {
         cleanedTranslations.set(orig, cleanPersianTranslation(persian));
       });
 
+      console.log('🔧 Reconstructing ASS file...');
       const translatedAssContent = AssParser.reconstructAssFile(parsedLines, cleanedTranslations);
+
+      console.log('🎉 Translation process completed successfully');
 
       updateState({
         translatedContent: translatedAssContent,
         status: { ...status, progress: 100 }
       });
+      
       toast({
-        title: "ترجمه پیشرفته و باکیفیت تکمیل شد",
+        title: "ترجمه تکمیل شد",
         description: `${translations.size} خط با موفقیت ترجمه شد`
       });
+      
     } catch (err) {
+      console.error('❌ Translation error:', err);
       const errorMessage = err instanceof Error ? err.message : 'خطای نامشخص در ترجمه';
       updateState({ error: errorMessage });
       toast({
@@ -156,6 +191,7 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
         variant: "destructive"
       });
     } finally {
+      console.log('🏁 Translation process finished');
       updateState({ isTranslating: false });
     }
   };

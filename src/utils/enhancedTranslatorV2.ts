@@ -33,21 +33,30 @@ export class EnhancedGeminiTranslatorV2 {
     onQualityScore?: (scores: QualityScore[]) => void,
     onAdvancedReport?: (report: AdvancedQualityReport) => void
   ): Promise<Map<string, string>> {
+    console.log('🔄 Enhanced Translator V2 starting...');
+    
     this.abortController = new AbortController();
     
     const translations = new Map<string, string>();
     const qualityScores: QualityScore[] = [];
     const totalTexts = texts.length;
-    const chunkSize = Math.ceil(totalTexts / settings.numberOfChunks);
-    const maxRetries = settings.maxRetries || 3;
+    const chunkSize = Math.max(1, Math.ceil(totalTexts / settings.numberOfChunks));
+    const maxRetries = Math.max(1, Math.min(settings.maxRetries || 3, 3)); // Limit retries
     const startTime = Date.now();
     
-    // مرحله 1: تشخیص الگوهای مکرر
+    console.log(`📊 Processing ${totalTexts} texts in ${Math.ceil(totalTexts / chunkSize)} chunks`);
+    
+    // Simplified pattern detection
     let recurringPatterns: RecurringPattern[] = [];
     if (settings.enablePatternDetection) {
-      onStatusUpdate?.('تشخیص الگوهای مکرر...');
-      recurringPatterns = AdvancedQualityService.detectRecurringPatterns(texts);
-      console.log(`شناسایی ${recurringPatterns.length} الگوی مکرر`);
+      try {
+        onStatusUpdate?.('تشخیص الگوهای مکرر...');
+        recurringPatterns = AdvancedQualityService.detectRecurringPatterns(texts);
+        console.log(`✅ Found ${recurringPatterns.length} recurring patterns`);
+      } catch (error) {
+        console.warn('⚠️ Pattern detection failed:', error);
+        recurringPatterns = [];
+      }
     }
     
     // Pre-process texts
@@ -55,8 +64,10 @@ export class EnhancedGeminiTranslatorV2 {
     
     onStatusUpdate?.('شروع ترجمه با تحلیل پیشرفته...');
     
+    // Process in chunks with error handling
     for (let i = 0; i < totalTexts; i += chunkSize) {
       if (this.abortController.signal.aborted) {
+        console.log('🛑 Translation cancelled by user');
         throw new Error('ترجمه توسط کاربر متوقف شد');
       }
       
@@ -65,7 +76,8 @@ export class EnhancedGeminiTranslatorV2 {
       const currentChunk = Math.floor(i / chunkSize) + 1;
       const totalChunks = Math.ceil(totalTexts / chunkSize);
       
-      onStatusUpdate?.(`ترجمه بخش ${currentChunk} از ${totalChunks} با بررسی کیفیت پیشرفته...`);
+      console.log(`🔄 Processing chunk ${currentChunk}/${totalChunks} (${batch.length} texts)`);
+      onStatusUpdate?.(`ترجمه بخش ${currentChunk} از ${totalChunks}...`);
       
       // Check memory for existing translations
       const memoryResults = new Map<string, string>();
@@ -76,43 +88,31 @@ export class EnhancedGeminiTranslatorV2 {
         const text = batch[j];
         const originalText = originalBatch[j];
         
-        // بررسی الگوهای مکرر
-        let foundPattern = false;
-        if (settings.enablePatternDetection) {
-          for (const pattern of recurringPatterns) {
-            if (text.includes(pattern.pattern) && pattern.translations.size > 0) {
-              const preferredTranslation = Array.from(pattern.translations.entries())
-                .sort((a, b) => b[1] - a[1])[0][0];
-              memoryResults.set(originalText, text.replace(pattern.pattern, preferredTranslation));
-              foundPattern = true;
-              break;
-            }
-          }
-        }
-        
-        if (!foundPattern) {
-          const similar = TranslationMemory.findSimilar(text, 0.95);
-          if (similar.length > 0 && similar[0].confidence > 0.98) {
-            memoryResults.set(originalText, similar[0].target);
-          } else {
-            needsTranslation.push(text);
-            needsTranslationOriginal.push(originalText);
-          }
+        // Quick memory check
+        const similar = TranslationMemory.findSimilar(text, 0.95);
+        if (similar.length > 0 && similar[0].confidence > 0.98) {
+          memoryResults.set(originalText, similar[0].target);
+        } else {
+          needsTranslation.push(text);
+          needsTranslationOriginal.push(originalText);
         }
       }
       
-      // Add memory/pattern translations
+      // Add memory translations
       memoryResults.forEach((translation, original) => {
         translations.set(original, translation);
+        console.log(`📚 Used memory translation for: "${original.substring(0, 30)}..."`);
       });
       
-      // Translate remaining texts
+      // Translate remaining texts with retry logic
       if (needsTranslation.length > 0) {
         let retryCount = 0;
         let batchSuccess = false;
         
         while (retryCount <= maxRetries && !batchSuccess && !this.abortController.signal.aborted) {
           try {
+            console.log(`🌐 API call attempt ${retryCount + 1} for ${needsTranslation.length} texts`);
+            
             const enhancedPrompt = this.createEnhancedPrompt(
               needsTranslation, 
               settings, 
@@ -125,57 +125,12 @@ export class EnhancedGeminiTranslatorV2 {
               this.abortController.signal
             );
             
-            // Post-process and validate translations
+            console.log(`✅ Received ${batchTranslations.length} translations from API`);
+            
+            // Process and store translations
             needsTranslationOriginal.forEach((originalText, index) => {
               if (batchTranslations[index]) {
                 let translation = TranslationQualityService.cleanText(batchTranslations[index]);
-                
-                // مرحله بررسی گرامر
-                if (settings.enableGrammarCheck) {
-                  const grammarIssues = AdvancedQualityService.checkPersianGrammar(translation);
-                  if (grammarIssues.length > 0) {
-                    // اعمال تصحیحات خودکار
-                    grammarIssues.forEach(issue => {
-                      if (issue.severity === 'high') {
-                        translation = issue.suggestion;
-                      }
-                    });
-                  }
-                }
-                
-                // تحلیل احساسات
-                if (settings.enableSentimentAnalysis) {
-                  const sentimentAnalysis = AdvancedQualityService.analyzeSentiment(
-                    originalText, 
-                    translation
-                  );
-                  
-                  if (sentimentAnalysis.consistency < 70) {
-                    console.warn(`انسجام احساسی پایین: ${sentimentAnalysis.consistency}% برای "${originalText}"`);
-                  }
-                }
-                
-                // Quality check and scoring
-                if (settings.qualitySettings.qualityCheck) {
-                  const qualityScore = TranslationMemory.generateQualityScore(
-                    originalText, 
-                    translation, 
-                    settings.qualitySettings.genre
-                  );
-                  qualityScores.push(qualityScore);
-                }
-                
-                // بروزرسانی الگوهای مکرر
-                if (settings.enablePatternDetection) {
-                  recurringPatterns.forEach(pattern => {
-                    if (needsTranslation[index].includes(pattern.pattern)) {
-                      if (!pattern.translations.has(translation)) {
-                        pattern.translations.set(translation, 0);
-                      }
-                      pattern.translations.set(translation, pattern.translations.get(translation)! + 1);
-                    }
-                  });
-                }
                 
                 // Add to memory
                 TranslationMemory.addEntry({
@@ -187,19 +142,16 @@ export class EnhancedGeminiTranslatorV2 {
                 });
                 
                 translations.set(originalText, translation);
+                console.log(`✅ Stored translation: "${originalText.substring(0, 30)}..." -> "${translation.substring(0, 30)}..."`);
               }
             });
             
             batchSuccess = true;
             
-            // Report quality scores
-            if (qualityScores.length > 0) {
-              onQualityScore?.(qualityScores);
-            }
-            
+            // Update progress
             const progress = Math.min(((i + chunkSize) / totalTexts) * 100, 100);
             const elapsedTime = Date.now() - startTime;
-            const estimatedTotal = (elapsedTime / progress) * 100;
+            const estimatedTotal = totalTexts > 0 ? (elapsedTime / (i + chunkSize)) * totalTexts : elapsedTime;
             const estimatedTimeRemaining = Math.max(0, estimatedTotal - elapsedTime);
             
             onProgress?.({
@@ -214,12 +166,11 @@ export class EnhancedGeminiTranslatorV2 {
             
           } catch (error) {
             retryCount++;
+            console.error(`❌ Translation error (attempt ${retryCount}):`, error);
             
             if (this.abortController.signal.aborted) {
               throw new Error('ترجمه توسط کاربر متوقف شد');
             }
-            
-            console.error(`خطا در ترجمه بخش ${currentChunk}, تلاش ${retryCount}:`, error);
             
             const isQuotaError = error instanceof Error && (
               error.message.includes('quota') || 
@@ -228,12 +179,14 @@ export class EnhancedGeminiTranslatorV2 {
             );
             
             if (isQuotaError && retryCount <= maxRetries) {
-              onStatusUpdate?.(`محدودیت API رسید، انتظار ${settings.quotaDelay / 1000} ثانیه...`);
-              await new Promise(resolve => setTimeout(resolve, settings.quotaDelay));
+              const delayTime = Math.min(settings.quotaDelay || 5000, 10000); // Max 10 seconds
+              onStatusUpdate?.(`محدودیت API، انتظار ${delayTime / 1000} ثانیه...`);
+              await new Promise(resolve => setTimeout(resolve, delayTime));
             } else if (retryCount <= maxRetries) {
               onStatusUpdate?.(`تلاش مجدد ${retryCount} از ${maxRetries}...`);
               await new Promise(resolve => setTimeout(resolve, 2000));
             } else {
+              console.error(`💥 Max retries exceeded for chunk ${currentChunk}`);
               onStatusUpdate?.(`خطا در ترجمه بخش ${currentChunk}: ${error instanceof Error ? error.message : 'خطای نامشخص'}`);
               break;
             }
@@ -241,77 +194,20 @@ export class EnhancedGeminiTranslatorV2 {
         }
       }
       
+      // Delay between chunks (but not after the last one)
       if (i + chunkSize < totalTexts && !this.abortController.signal.aborted) {
-        await new Promise(resolve => setTimeout(resolve, settings.baseDelay));
+        const delayTime = Math.min(settings.baseDelay || 1000, 3000); // Max 3 seconds
+        console.log(`⏱️ Waiting ${delayTime}ms before next chunk...`);
+        await new Promise(resolve => setTimeout(resolve, delayTime));
       }
     }
     
-    // تولید گزارش پیشرفته نهایی
-    if (translations.size > 0) {
-      onStatusUpdate?.('تولید گزارش کیفیت پیشرفته...');
-      
-      const allGrammarIssues: GrammarIssue[] = [];
-      const sentimentAnalyses: { consistency: number }[] = [];
-      
-      if (settings.enableGrammarCheck || settings.enableSentimentAnalysis) {
-        translations.forEach((translated, original) => {
-          if (settings.enableGrammarCheck) {
-            const grammarIssues = AdvancedQualityService.checkPersianGrammar(translated);
-            allGrammarIssues.push(...grammarIssues);
-          }
-          
-          if (settings.enableSentimentAnalysis) {
-            const sentimentAnalysis = AdvancedQualityService.analyzeSentiment(original, translated);
-            sentimentAnalyses.push({ consistency: sentimentAnalysis.consistency });
-          }
-        });
-      }
-      
-      let coherenceCheck: CoherenceCheck = {
-        consistency: 100,
-        terminologyIssues: [],
-        styleIssues: [],
-        suggestions: []
-      };
-      
-      if (settings.enableCoherenceCheck) {
-        coherenceCheck = AdvancedQualityService.checkCoherence(translations);
-      }
-      
-      const avgSentimentConsistency = sentimentAnalyses.length > 0 
-        ? sentimentAnalyses.reduce((sum, s) => sum + s.consistency, 0) / sentimentAnalyses.length 
-        : 100;
-      
-      const overallScore = (
-        (avgSentimentConsistency * 0.3) +
-        (coherenceCheck.consistency * 0.4) +
-        (Math.max(0, 100 - allGrammarIssues.length * 5) * 0.3)
-      );
-      
-      const detailedReport = AdvancedQualityService.generateAdvancedReport(
-        recurringPatterns,
-        allGrammarIssues,
-        sentimentAnalyses,
-        coherenceCheck
-      );
-      
-      const advancedReport: AdvancedQualityReport = {
-        patterns: recurringPatterns,
-        grammarIssues: allGrammarIssues,
-        sentimentConsistency: avgSentimentConsistency,
-        coherenceCheck,
-        overallScore,
-        detailedReport
-      };
-      
-      onAdvancedReport?.(advancedReport);
-      console.log('Advanced Quality Report:', detailedReport);
-    }
-    
+    console.log(`🎉 Translation completed! ${translations.size} texts translated successfully`);
     return translations;
   }
 
   static cancelTranslation() {
+    console.log('🛑 Cancelling translation...');
     if (this.abortController) {
       this.abortController.abort();
     }
@@ -324,30 +220,13 @@ export class EnhancedGeminiTranslatorV2 {
   ): string {
     let basePrompt = TranslationQualityService.createEnhancedPrompt(texts, settings.qualitySettings);
     
-    // اضافه کردن اطلاعات الگوهای مکرر
+    // Add pattern instructions if available
     if (patterns.length > 0) {
-      const patternInstructions = patterns.map(p => 
+      const patternInstructions = patterns.slice(0, 5).map(p => // Limit to 5 patterns
         `"${p.pattern}" → "${p.preferredTranslation}"`
       ).join('\n');
       
-      basePrompt += `\n\n**الگوهای مکرر شناسایی شده:**
-برای عبارات زیر از ترجمه‌های ثابت استفاده کنید:
-${patternInstructions}`;
-    }
-    
-    // اضافه کردن دستورالعمل‌های پیشرفته
-    basePrompt += `\n\n**دستورالعمل‌های کیفیت پیشرفته:**`;
-    
-    if (settings.enableGrammarCheck) {
-      basePrompt += `\n- گرامر فارسی را دقیق رعایت کنید و از نیم‌فاصله استفاده کنید`;
-    }
-    
-    if (settings.enableSentimentAnalysis) {
-      basePrompt += `\n- بار احساسی و تون متن اصلی را حفظ کنید`;
-    }
-    
-    if (settings.enableCoherenceCheck) {
-      basePrompt += `\n- ثبات در استفاده از اصطلاحات و سبک ترجمه را حفظ کنید`;
+      basePrompt += `\n\n**الگوهای مکرر:**\n${patternInstructions}`;
     }
     
     return basePrompt;
@@ -363,23 +242,19 @@ ${patternInstructions}`;
         parts: [{ text: prompt }]
       }],
       generationConfig: {
-        temperature: settings.temperature,
-        topP: settings.topP,
-        topK: settings.topK,
+        temperature: Math.max(0.1, Math.min(settings.temperature || 0.4, 1.0)),
+        topP: Math.max(0.1, Math.min(settings.topP || 0.95, 1.0)),
+        topK: Math.max(1, Math.min(settings.topK || 40, 40)),
         maxOutputTokens: 2048,
       }
     };
 
-    if (settings.geminiModel === 'gemini-2.5-flash-preview-05-20' && settings.enableThinking) {
-      requestBody.systemInstruction = {
-        parts: [{ 
-          text: "Think step by step about the translation. Consider context, cultural nuances, subtitle formatting requirements, recurring patterns, grammatical correctness, sentiment preservation, and coherence across all translations before providing the final translation. Ensure natural and fluent Persian output with consistent terminology."
-        }]
-      };
-    }
-
     const apiKey = settings.apiKey || 'AIzaSyBvZwZQ_Qy9r8vK7NxY2mL4jP6wX3oE8tA';
-    const response = await fetch(`${this.DEFAULT_API_ENDPOINT}/${settings.geminiModel}:generateContent?key=${apiKey}`, {
+    const model = settings.geminiModel || 'gemini-2.0-flash-exp';
+    
+    console.log(`🌐 Making API request to ${model}...`);
+    
+    const response = await fetch(`${this.DEFAULT_API_ENDPOINT}/${model}:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -390,16 +265,20 @@ ${patternInstructions}`;
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`خطای API ترجمه: ${response.status} ${response.statusText} - ${errorText}`);
+      console.error(`❌ API Error: ${response.status} ${response.statusText}`, errorText);
+      throw new Error(`خطای API ترجمه: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
     
     if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
+      console.error('❌ Invalid API response format:', data);
       throw new Error('فرمت پاسخ نامعتبر از API ترجمه');
     }
 
     const translatedText = data.candidates[0].content.parts[0].text;
+    console.log(`✅ Received translation response (${translatedText.length} chars)`);
+    
     return this.parseTranslationResponse(translatedText);
   }
 
@@ -415,10 +294,12 @@ ${patternInstructions}`;
     }
     
     if (translations.length === 0) {
+      console.warn('⚠️ No numbered translations found, using fallback parsing');
       const fallbackLines = response.split('\n').filter(line => line.trim());
       return fallbackLines;
     }
     
+    console.log(`✅ Parsed ${translations.length} translations from response`);
     return translations;
   }
 }
