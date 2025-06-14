@@ -22,6 +22,9 @@ export interface AdvancedQualityReport {
   detailedReport: string;
 }
 
+// Re-export AdvancedTranslationSettings for backward compatibility
+export type { AdvancedTranslationSettings } from '@/types/translation';
+
 export class EnhancedGeminiTranslatorV2 {
   private static readonly DEFAULT_API_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
   private static abortController: AbortController | null = null;

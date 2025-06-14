@@ -35,7 +35,9 @@ export interface GrammarIssue {
 
 export interface CoherenceCheck {
   score: number;
-  issues: string[];
+  consistency: number;
+  terminologyIssues: string[];
+  styleIssues: string[];
   suggestions: string[];
 }
 

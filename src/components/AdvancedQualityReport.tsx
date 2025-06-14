@@ -143,9 +143,9 @@ const AdvancedQualityReport: React.FC<AdvancedQualityReportProps> = ({
                         {pattern.frequency} بار
                       </Badge>
                     </div>
-                    {pattern.translations.size > 0 && (
+                    {pattern.translations.length > 0 && (
                       <div className="text-xs text-muted-foreground">
-                        ترجمه‌ها: {Array.from(pattern.translations.keys()).join(', ')}
+                        ترجمه‌ها: {pattern.translations.join(', ')}
                       </div>
                     )}
                   </div>
@@ -182,7 +182,7 @@ const AdvancedQualityReport: React.FC<AdvancedQualityReportProps> = ({
                       </Badge>
                     </div>
                     <div className="text-sm text-foreground">
-                      {issue.suggestion}
+                      {issue.suggestions.join(', ')}
                     </div>
                   </div>
                 ))}
