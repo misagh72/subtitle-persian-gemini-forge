@@ -1,10 +1,11 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import FileUpload from '@/components/FileUpload';
 import FileStats from '@/components/FileStats';
-import SettingsPanel from '@/components/SettingsPanel';
+import MinimalHeader from '@/components/MinimalHeader';
+import MinimalFooter from '@/components/MinimalFooter';
+import MinimalSettings from '@/components/MinimalSettings';
 import QualitySettingsPanel from '@/components/QualitySettingsPanel';
 import TranslationProgress from '@/components/TranslationProgress';
 import QualityReport from '@/components/QualityReport';
@@ -182,18 +183,9 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* HEADER - ساده، مینیمال و بدون افکت‌های تصویری و انیمیشن */}
-      <header className="border-b border-border/20 bg-background">
-        <div className="container mx-auto py-8 px-4 text-center">
-          <h1 className="text-3xl font-bold text-primary mb-1" style={{ letterSpacing: '-0.02em' }}>
-            مترجم زیرنویس ASS
-          </h1>
-          <p className="text-base text-muted-foreground">
-            ترجمه سریع و با کیفیت زیرنویس‌های شما به فارسی
-          </p>
-        </div>
-      </header>
-      {/* مینیمال: فقط محتوای اصلی، حذف افکت و کارت‌های اضافه */}
+      {/* HEADER */}
+      <MinimalHeader />
+      {/* مینیمال: فقط محتوای اصلی */}
       <main className="container mx-auto flex-1 px-2 pt-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* محتوای اصلی */}
@@ -243,60 +235,21 @@ const Index = () => {
               fileName={selectedFile?.name || ''}
             />
           </div>
-          {/* تنظیمات */}
-          <div className="space-y-4">
-            <Card className="border bg-card rounded-lg shadow-none">
-              <CardHeader>
-                <CardTitle className="text-base font-medium">تنظیمات</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <SettingsPanel
-                  apiKey={settings.apiKey}
-                  setApiKey={key => updateSettings({ apiKey: key })}
-                  temperature={settings.temperature}
-                  setTemperature={temp => updateSettings({ temperature: temp })}
-                  topP={settings.topP}
-                  setTopP={topP => updateSettings({ topP })}
-                  topK={settings.topK}
-                  setTopK={topK => updateSettings({ topK })}
-                  usePersonalApi={settings.usePersonalApi}
-                  setUsePersonalApi={use => updateSettings({ usePersonalApi: use })}
-                  baseDelay={settings.baseDelay}
-                  setBaseDelay={delay => updateSettings({ baseDelay: delay })}
-                  quotaDelay={settings.quotaDelay}
-                  setQuotaDelay={delay => updateSettings({ quotaDelay: delay })}
-                  numberOfChunks={settings.numberOfChunks}
-                  setNumberOfChunks={chunks => updateSettings({ numberOfChunks: chunks })}
-                  geminiModel={settings.geminiModel}
-                  setGeminiModel={model => updateSettings({ geminiModel: model })}
-                  maxRetries={settings.maxRetries}
-                  setMaxRetries={retries => updateSettings({ maxRetries: retries })}
-                  enableThinking={settings.enableThinking}
-                  setEnableThinking={enable => updateSettings({ enableThinking: enable })}
-                  onApplyPreset={applyPreset}
-                />
-              </CardContent>
-            </Card>
-            <Card className="border bg-card rounded-lg shadow-none">
-              <CardHeader>
-                <CardTitle className="text-base font-medium">تنظیمات کیفیت</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <QualitySettingsPanel
-                  qualitySettings={qualitySettings}
-                  onUpdateQualitySettings={updateQualitySettings}
-                />
-              </CardContent>
-            </Card>
-            <QualityReport scores={qualityScores} isVisible={showQualityReport} />
-            <MemoryManagement isVisible={showMemoryManagement} />
-          </div>
+          {/* تنظیمات مینیمال */}
+          <MinimalSettings
+            settings={settings}
+            qualitySettings={qualitySettings}
+            updateSettings={updateSettings}
+            updateQualitySettings={updateQualitySettings}
+            applyPreset={applyPreset}
+            qualityScores={qualityScores}
+            showQualityReport={showQualityReport}
+            showMemoryManagement={showMemoryManagement}
+          />
         </div>
       </main>
       {/* فوتر مینیمال */}
-      <footer className="border-t border-border/20 py-6 mt-12 text-center text-sm text-muted-foreground bg-background">
-        مترجم زیرنویس ASS • نسخه ۲.۰
-      </footer>
+      <MinimalFooter />
     </div>
   );
 };
