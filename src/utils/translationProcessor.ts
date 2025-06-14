@@ -1,8 +1,7 @@
 
-import { TranslationMemory, QualityScore } from '@/utils/translationMemory';
+import { TranslationMemory } from '@/utils/translationMemory';
 import { TranslationQualityService } from '@/utils/translationQuality';
-import { AdvancedTranslationSettings } from '@/utils/enhancedTranslatorV2';
-import { TranslationChunk, ProcessingMetrics } from '@/types/translation';
+import { TranslationChunk, ProcessingMetrics, AdvancedTranslationSettings, QualityScore } from '@/types/translation';
 import { TranslationApiClient } from './apiClient';
 
 export class TranslationProcessor {

@@ -1,6 +1,5 @@
 
-import { AdvancedTranslationSettings } from '@/utils/enhancedTranslatorV2';
-import { ApiError } from '@/types/translation';
+import { AdvancedTranslationSettings, ApiError } from '@/types/translation';
 
 export class TranslationApiClient {
   private static readonly DEFAULT_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -86,12 +85,12 @@ export class TranslationApiClient {
       const errorText = await response.text();
       console.error(`❌ API Error: ${response.status}`, errorText);
       
-      const apiError: ApiError = {
+      const apiError = new ApiError({
         code: response.status.toString(),
         message: this.getErrorMessage(response.status),
         retryable: this.isRetryableError(response.status),
         statusCode: response.status
-      };
+      });
       
       throw apiError;
     }
@@ -135,26 +134,26 @@ export class TranslationApiClient {
 
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
-        return {
+        return new ApiError({
           code: 'ABORTED',
           message: 'درخواست لغو شد',
           retryable: false
-        };
+        });
       }
 
       if (error.message.includes('Failed to fetch') || error.message.includes('Network')) {
-        return {
+        return new ApiError({
           code: 'NETWORK_ERROR',
           message: 'خطای شبکه - لطفا اتصال خود را بررسی کنید',
           retryable: true
-        };
+        });
       }
     }
 
-    return {
+    return new ApiError({
       code: 'UNKNOWN_ERROR',
       message: 'خطای نامشخص',
       retryable: false
-    };
+    });
   }
 }

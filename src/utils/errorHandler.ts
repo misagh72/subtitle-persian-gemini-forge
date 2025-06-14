@@ -46,35 +46,35 @@ export class TranslationErrorHandler {
     
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
-        return {
+        return new ApiError({
           code: 'ABORTED',
           message: 'ترجمه توسط کاربر متوقف شد',
           retryable: false
-        };
+        });
       }
       
       if (error.message.includes('Failed to fetch') || error.message.includes('Network')) {
-        return {
+        return new ApiError({
           code: 'NETWORK_ERROR',
           message: 'خطای اتصال به اینترنت',
           retryable: true
-        };
+        });
       }
       
       if (error.message.includes('quota') || error.message.includes('429')) {
-        return {
+        return new ApiError({
           code: 'RATE_LIMIT',
           message: 'محدودیت API - لطفا چند دقیقه صبر کنید',
           retryable: true
-        };
+        });
       }
     }
     
-    return {
+    return new ApiError({
       code: 'UNKNOWN_ERROR',
       message: error?.message || 'خطای نامشخص',
       retryable: false
-    };
+    });
   }
 
   static getErrorMessage(error: ApiError): string {
@@ -93,7 +93,7 @@ export class TranslationErrorHandler {
   }
 
   private static isApiError(error: any): error is ApiError {
-    return error && typeof error === 'object' && 'code' in error && 'message' in error;
+    return error instanceof ApiError;
   }
 
   private static getRetryDelay(error: ApiError): number {

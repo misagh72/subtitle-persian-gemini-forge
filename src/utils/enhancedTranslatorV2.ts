@@ -1,19 +1,17 @@
+
 import { TranslationSettings, TranslationStatus } from './translator';
 import { TranslationQualitySettings } from './translationQuality';
-import { QualityScore } from './translationMemory';
 import { cleanPersianTranslation } from './postProcessPersian';
 import { TranslationProcessor } from './translationProcessor';
 import { TranslationErrorHandler } from './errorHandler';
-import { ProcessingMetrics } from '@/types/translation';
-
-export interface AdvancedTranslationSettings extends TranslationSettings {
-  qualitySettings: TranslationQualitySettings;
-  enablePatternDetection: boolean;
-  enableGrammarCheck: boolean;
-  enableSentimentAnalysis: boolean;
-  enableCoherenceCheck: boolean;
-  usePersonalApi: boolean;
-}
+import { 
+  ProcessingMetrics, 
+  QualityScore,
+  RecurringPattern,
+  GrammarIssue,
+  CoherenceCheck,
+  AdvancedTranslationSettings
+} from '@/types/translation';
 
 export interface AdvancedQualityReport {
   patterns: RecurringPattern[];
