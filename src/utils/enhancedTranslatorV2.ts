@@ -1,4 +1,3 @@
-
 import { TranslationSettings, TranslationStatus } from './translator';
 import { TranslationQualitySettings, TranslationQualityService } from './translationQuality';
 import { TranslationMemory, QualityScore } from './translationMemory';
@@ -10,6 +9,7 @@ export interface AdvancedTranslationSettings extends TranslationSettings {
   enableGrammarCheck: boolean;
   enableSentimentAnalysis: boolean;
   enableCoherenceCheck: boolean;
+  usePersonalApi: boolean;
 }
 
 export interface AdvancedQualityReport {
