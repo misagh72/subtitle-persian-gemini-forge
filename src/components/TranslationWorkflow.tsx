@@ -128,8 +128,7 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
         enhancedSettings,
         (newStatus) => updateState({ status: newStatus }),
         (message) => updateState({ statusMessage: message }),
-        (scores) => addQualityScores(scores),
-        { dialogueContexts: dialogueTextsWithContext }
+        (scores) => addQualityScores(scores)
       );
 
       // Clean up resulting translations with Persian-focused post-processing
