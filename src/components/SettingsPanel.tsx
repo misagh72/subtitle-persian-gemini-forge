@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Settings, Zap, Scale, Sparkles } from 'lucide-react';
 import { TRANSLATION_PRESETS } from '@/hooks/useTranslationState';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Button } from '@/components/ui/button';
 
 interface SettingsPanelProps {
   apiKey: string;
@@ -60,30 +60,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   setEnableThinking,
   onApplyPreset,
 }) => {
-  const [activePreset, setActivePreset] = useState('');
-
-  useEffect(() => {
-    let matchedPreset: string = '';
-    for (const key in TRANSLATION_PRESETS) {
-      const presetName = key as keyof typeof TRANSLATION_PRESETS;
-      const presetSettings = TRANSLATION_PRESETS[presetName].settings;
-      const allMatch = 
-        presetSettings.temperature === temperature &&
-        presetSettings.topP === topP &&
-        presetSettings.topK === topK &&
-        presetSettings.numberOfChunks === numberOfChunks &&
-        presetSettings.baseDelay === baseDelay &&
-        presetSettings.quotaDelay === quotaDelay &&
-        presetSettings.maxRetries === maxRetries;
-      
-      if (allMatch) {
-        matchedPreset = presetName;
-        break;
-      }
-    }
-    setActivePreset(matchedPreset);
-  }, [temperature, topP, topK, numberOfChunks, baseDelay, quotaDelay, maxRetries]);
-
   const geminiModels = [
     { value: 'gemini-2.0-flash-exp', label: 'Gemini 2 Flash (پیشفرض)' },
     { value: 'gemini-2.5-flash-preview-05-20', label: 'Gemini 2.5 Flash' },
@@ -100,12 +76,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
   const isThinkingSupported = geminiModel === 'gemini-2.5-flash-preview-05-20';
 
-  const handlePresetChange = (value: string) => {
-    if (value) {
-      onApplyPreset(value as keyof typeof TRANSLATION_PRESETS);
-    }
-  };
-
   return (
     <Card className="glass-effect hover-glow animate-fade-in">
       <CardHeader>
@@ -118,25 +88,20 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         {/* Presets */}
         <div className="space-y-3">
           <Label className="text-foreground">تنظیمات پیش‌فرض</Label>
-          <ToggleGroup
-            type="single"
-            value={activePreset}
-            onValueChange={handlePresetChange}
-            className="grid grid-cols-3 gap-2"
-          >
+          <div className="grid grid-cols-3 gap-2">
             {presetButtons.map(({ key, label, icon: Icon, color }) => (
-              <ToggleGroupItem
+              <Button
                 key={key}
-                value={key}
                 variant="outline"
                 size="sm"
+                onClick={() => onApplyPreset(key)}
                 className="flex flex-col items-center gap-1 h-auto py-2 hover-glow"
               >
                 <Icon className={`w-4 h-4 ${color}`} />
                 <span className="text-xs">{label}</span>
-              </ToggleGroupItem>
+              </Button>
             ))}
-          </ToggleGroup>
+          </div>
         </div>
 
         {/* API Settings */}
