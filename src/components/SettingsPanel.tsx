@@ -115,7 +115,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 id="personal-api"
                 checked={usePersonalApi}
                 onCheckedChange={setUsePersonalApi}
-                className="data-[state=checked]:bg-primary"
               />
             </div>
           </div>
@@ -167,7 +166,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     id="thinking-mode"
                     checked={enableThinking}
                     onCheckedChange={setEnableThinking}
-                    className="data-[state=checked]:bg-primary"
                   />
                 </div>
               </div>
