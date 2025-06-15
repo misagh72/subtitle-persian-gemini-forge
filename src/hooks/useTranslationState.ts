@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react';
 import { TranslationSettings, TranslationStatus } from '@/utils/translator';
 import { TranslationQualitySettings } from '@/utils/translationQuality';
@@ -167,8 +168,8 @@ export const useSettingsState = () => {
   });
 
   const [qualitySettings, setQualitySettings] = useState<TranslationQualitySettings>({
-    genre: 'movie',
-    formalityLevel: 'neutral',
+    genre: 'animation',
+    formalityLevel: 'informal',
     preserveNames: true,
     contextualTranslation: true,
     qualityCheck: true
