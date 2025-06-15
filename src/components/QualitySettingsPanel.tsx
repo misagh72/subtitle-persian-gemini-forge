@@ -94,7 +94,6 @@ const QualitySettingsPanel: React.FC<QualitySettingsPanelProps> = ({
               id="preserve-names"
               checked={qualitySettings.preserveNames}
               onCheckedChange={(checked) => onUpdateQualitySettings({ preserveNames: checked })}
-              className="data-[state=checked]:bg-primary"
             />
           </div>
           <p className="text-xs text-muted-foreground">
@@ -114,7 +113,6 @@ const QualitySettingsPanel: React.FC<QualitySettingsPanelProps> = ({
               id="contextual"
               checked={qualitySettings.contextualTranslation}
               onCheckedChange={(checked) => onUpdateQualitySettings({ contextualTranslation: checked })}
-              className="data-[state=checked]:bg-primary"
             />
           </div>
           <p className="text-xs text-muted-foreground">
@@ -134,7 +132,6 @@ const QualitySettingsPanel: React.FC<QualitySettingsPanelProps> = ({
               id="quality-check"
               checked={qualitySettings.qualityCheck}
               onCheckedChange={(checked) => onUpdateQualitySettings({ qualityCheck: checked })}
-              className="data-[state=checked]:bg-primary"
             />
           </div>
           <p className="text-xs text-muted-foreground">
