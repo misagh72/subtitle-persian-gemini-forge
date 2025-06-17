@@ -3,8 +3,14 @@ export interface AssLine {
   type: 'dialogue' | 'style' | 'info' | 'other';
   content: string;
   text?: string;
-  inlineTags?: string[];
+  inlineTags?: InlineTag[];
   originalLine: string;
+}
+
+export interface InlineTag {
+  tag: string;
+  position: number;
+  type: 'opening' | 'closing' | 'standalone';
 }
 
 export class AssParser {
@@ -17,7 +23,7 @@ export class AssParser {
       
       if (trimmedLine.startsWith('Dialogue:')) {
         const dialoguePart = this.extractDialogueText(trimmedLine);
-        const inlineTags = this.extractInlineTags(dialoguePart);
+        const inlineTags = this.extractInlineTagsWithPositions(dialoguePart);
         const cleanText = this.removeInlineTags(dialoguePart);
         
         parsedLines.push({
@@ -60,6 +66,46 @@ export class AssParser {
     return '';
   }
 
+  static extractInlineTagsWithPositions(text: string): InlineTag[] {
+    const tags: InlineTag[] = [];
+    const tagRegex = /\{[^}]*\}/g;
+    let match;
+    let offset = 0;
+
+    // Create a copy without tags to calculate clean text positions
+    let cleanText = '';
+    let lastIndex = 0;
+
+    while ((match = tagRegex.exec(text)) !== null) {
+      // Add text before this tag to clean text
+      cleanText += text.substring(lastIndex, match.index);
+      
+      // Calculate position in clean text
+      const position = cleanText.length;
+      
+      // Determine tag type
+      const tagContent = match[0];
+      let type: 'opening' | 'closing' | 'standalone' = 'standalone';
+      
+      if (tagContent.includes('\\r') || tagContent.includes('\\i') || tagContent.includes('\\b') || tagContent.includes('\\u')) {
+        type = 'opening';
+      } else if (tagContent.includes('\\r0') || tagContent.includes('\\i0') || tagContent.includes('\\b0') || tagContent.includes('\\u0')) {
+        type = 'closing';
+      }
+
+      tags.push({
+        tag: tagContent,
+        position,
+        type
+      });
+
+      lastIndex = match.index + match[0].length;
+    }
+
+    console.log('🏷️ Extracted tags with positions:', tags);
+    return tags;
+  }
+
   static extractInlineTags(text: string): string[] {
     const tagRegex = /\{[^}]*\}/g;
     const matches = text.match(tagRegex);
@@ -70,33 +116,38 @@ export class AssParser {
     return text.replace(/\{[^}]*\}/g, '').trim();
   }
 
-  static reconstructDialogue(originalLine: string, translatedText: string, inlineTags: string[]): string {
+  static reconstructDialogue(originalLine: string, translatedText: string, inlineTags: InlineTag[]): string {
     const parts = originalLine.split(',');
     if (parts.length >= 10) {
-      // Distribute inline tags across translated words if needed
       let finalText = translatedText;
       
-      if (inlineTags.length > 0) {
-        const words = translatedText.split(' ');
-        const tagsPerWord = Math.ceil(inlineTags.length / Math.max(words.length, 1));
+      if (inlineTags && inlineTags.length > 0) {
+        console.log('🔧 Reconstructing dialogue with tags:', { translatedText, inlineTags });
         
-        let tagIndex = 0;
-        const wordsWithTags = words.map(word => {
-          let result = word;
-          for (let i = 0; i < tagsPerWord && tagIndex < inlineTags.length; i++) {
-            result = inlineTags[tagIndex] + result;
-            tagIndex++;
-          }
-          return result;
+        // Sort tags by position (descending) to insert from end to start
+        const sortedTags = [...inlineTags].sort((a, b) => b.position - a.position);
+        
+        // Calculate position mapping ratio
+        const originalLength = this.removeInlineTags(this.extractDialogueText(originalLine)).length;
+        const translatedLength = translatedText.length;
+        const ratio = translatedLength / Math.max(originalLength, 1);
+        
+        console.log('📏 Length mapping:', { originalLength, translatedLength, ratio });
+        
+        // Insert tags at proportional positions
+        sortedTags.forEach(tagInfo => {
+          const newPosition = Math.min(
+            Math.round(tagInfo.position * ratio),
+            translatedText.length
+          );
+          
+          console.log(`🎯 Placing tag "${tagInfo.tag}" at position ${newPosition} (original: ${tagInfo.position})`);
+          
+          // Insert tag at calculated position
+          finalText = finalText.slice(0, newPosition) + tagInfo.tag + finalText.slice(newPosition);
         });
         
-        // Add remaining tags to the last word
-        while (tagIndex < inlineTags.length) {
-          wordsWithTags[wordsWithTags.length - 1] += inlineTags[tagIndex];
-          tagIndex++;
-        }
-        
-        finalText = wordsWithTags.join(' ');
+        console.log('✨ Final text with tags:', finalText);
       }
       
       const newParts = [...parts.slice(0, 9), finalText];
@@ -106,9 +157,13 @@ export class AssParser {
   }
 
   static reconstructAssFile(parsedLines: AssLine[], translations: Map<string, string>): string {
+    console.log('🔄 Reconstructing ASS file with', translations.size, 'translations');
+    
     return parsedLines.map(line => {
       if (line.type === 'dialogue' && line.text && translations.has(line.text)) {
         const translatedText = translations.get(line.text)!;
+        console.log('📝 Reconstructing line:', { original: line.text, translated: translatedText, tags: line.inlineTags });
+        
         return this.reconstructDialogue(line.originalLine, translatedText, line.inlineTags || []);
       }
       return line.originalLine;
