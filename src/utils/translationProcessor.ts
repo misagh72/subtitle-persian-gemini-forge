@@ -13,6 +13,8 @@ export class TranslationProcessor {
     const chunkSize = Math.max(1, Math.ceil(totalTexts / actualChunks));
     const chunks: TranslationChunk[] = [];
     
+    console.log(`📦 Creating chunks: ${totalTexts} texts into ${actualChunks} chunks (size: ${chunkSize})`);
+    
     for (let i = 0; i < totalTexts; i += chunkSize) {
       const cleanedTexts = texts.slice(i, Math.min(i + chunkSize, totalTexts))
         .map(text => TranslationQualityService.cleanText(text));
@@ -23,6 +25,8 @@ export class TranslationProcessor {
         chunkIndex: Math.floor(i / chunkSize),
         totalChunks: Math.ceil(totalTexts / chunkSize)
       });
+      
+      console.log(`📦 Chunk ${Math.floor(i / chunkSize) + 1}: ${cleanedTexts.length} texts`);
     }
     
     return chunks;
@@ -62,9 +66,13 @@ export class TranslationProcessor {
   ): Promise<Map<string, string>> {
     const results = new Map<string, string>();
     
+    console.log(`🔄 Processing chunk ${chunk.chunkIndex + 1}/${chunk.totalChunks} with ${chunk.texts.length} texts`);
+    
     // Check memory first
     const { memoryHits, needsTranslation, needsTranslationOriginal } = 
       this.checkMemoryForChunk(chunk);
+    
+    console.log(`📚 Memory hits: ${memoryHits.size}, Need translation: ${needsTranslation.length}`);
     
     // Add memory hits to results
     memoryHits.forEach((translation, original) => {
@@ -86,6 +94,7 @@ export class TranslationProcessor {
       });
     }
 
+    console.log(`✅ Chunk ${chunk.chunkIndex + 1} completed: ${results.size} translations`);
     return results;
   }
 
@@ -96,15 +105,24 @@ export class TranslationProcessor {
     signal: AbortSignal,
     metrics: ProcessingMetrics
   ): Promise<Map<string, string>> {
+    console.log(`🌐 Translating ${texts.length} texts via API`);
+    
     const prompt = this.createPrompt(texts, settings);
+    console.log(`📝 Prompt created for ${texts.length} texts`);
+    
     const response = await TranslationApiClient.makeRequest(prompt, settings, signal);
+    console.log(`📨 API response received (${response.length} chars)`);
+    
     const parsedTranslations = this.parseResponse(response, texts.length);
+    console.log(`🔍 Parsed ${parsedTranslations.length} translations (expected: ${texts.length})`);
     
     const results = new Map<string, string>();
     
     originalTexts.forEach((originalText, index) => {
-      if (parsedTranslations[index]) {
+      if (index < parsedTranslations.length && parsedTranslations[index]) {
         const cleanedTranslation = TranslationQualityService.cleanText(parsedTranslations[index]);
+        
+        console.log(`✅ Mapping [${index}]: "${originalText.substring(0, 20)}..." → "${cleanedTranslation.substring(0, 20)}..."`);
         
         // Add to memory
         TranslationMemory.addEntry({
@@ -117,9 +135,12 @@ export class TranslationProcessor {
         
         results.set(originalText, cleanedTranslation);
         metrics.processedTexts++;
+      } else {
+        console.warn(`⚠️ Missing translation for index ${index}: "${originalText.substring(0, 30)}..."`);
       }
     });
     
+    console.log(`📊 Translation results: ${results.size}/${originalTexts.length} successful`);
     return results;
   }
 
@@ -128,19 +149,25 @@ export class TranslationProcessor {
   }
 
   private static parseResponse(response: string, expectedCount: number): string[] {
-    console.log('🔍 Parsing response:', response.substring(0, 200) + '...');
+    console.log(`🔍 Parsing response for ${expectedCount} expected translations`);
+    console.log(`📄 Response preview: "${response.substring(0, 200)}${response.length > 200 ? '...' : ''}"`);
     
-    // Split by separator used in prompt (---)
-    let translations = response.split('\n---\n')
+    let translations: string[] = [];
+    
+    // Method 1: Try splitting by double newlines (paragraph separator)
+    translations = response.split('\n\n')
       .map(line => line.trim())
       .filter(line => line.length > 0);
     
-    // If separator method doesn't work, try line-by-line
+    console.log(`🔍 Method 1 (double newlines): Found ${translations.length} translations`);
+    
+    // Method 2: If that doesn't work, try single newlines
     if (translations.length !== expectedCount) {
-      console.log('⚠️ Separator parsing failed, trying line-by-line');
+      console.log('⚠️ Double newline parsing failed, trying single newlines');
       translations = response.split('\n')
         .map(line => line.trim())
         .filter(line => line.length > 0)
+        .filter(line => !line.match(/^[1-9۰-۹]+\.?\s*$/)) // Remove standalone numbers
         .map(line => {
           // Remove any leading numbers or bullets
           return line
@@ -150,35 +177,65 @@ export class TranslationProcessor {
             .trim();
         })
         .filter(line => line.length > 0);
+      
+      console.log(`🔍 Method 2 (single newlines): Found ${translations.length} translations`);
     }
     
-    // If still doesn't match, try numbered parsing as fallback
+    // Method 3: Try triple dash separator (---)
     if (translations.length !== expectedCount) {
-      console.log('⚠️ Line parsing failed, trying numbered parsing');
-      const numberedTranslations: string[] = [];
-      const lines = response.trim().split('\n');
+      console.log('⚠️ Newline parsing failed, trying triple dash separator');
+      translations = response.split('---')
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+      
+      console.log(`🔍 Method 3 (triple dash): Found ${translations.length} translations`);
+    }
+    
+    // Method 4: Try to extract only Persian text lines
+    if (translations.length !== expectedCount) {
+      console.log('⚠️ Separator parsing failed, extracting Persian text');
+      const lines = response.split('\n');
+      translations = [];
       
       for (const line of lines) {
-        const match = line.match(/^\d+\.\s*(.+)$/) || line.match(/^[۰-۹]+\.\s*(.+)$/);
-        if (match) {
-          numberedTranslations.push(match[1].trim());
+        const trimmed = line.trim();
+        // Check if line contains significant Persian content
+        const persianChars = (trimmed.match(/[\u0600-\u06FF]/g) || []).length;
+        const totalChars = trimmed.replace(/\s/g, '').length;
+        
+        if (trimmed.length > 0 && persianChars > totalChars * 0.5 && trimmed.length > 2) {
+          // Clean the line
+          const cleaned = trimmed
+            .replace(/^\d+\.\s*/, '')
+            .replace(/^[۰-۹]+\.\s*/, '')
+            .replace(/^[-•*]\s*/, '')
+            .trim();
+          
+          if (cleaned.length > 0) {
+            translations.push(cleaned);
+          }
         }
       }
       
-      if (numberedTranslations.length > 0) {
-        translations = numberedTranslations;
-      }
+      console.log(`🔍 Method 4 (Persian extraction): Found ${translations.length} translations`);
     }
     
     // Final cleanup and validation
     translations = translations
       .slice(0, expectedCount)
-      .map(text => TranslationQualityService.cleanText(text));
+      .map(text => TranslationQualityService.cleanText(text))
+      .filter(text => text.length > 0);
     
-    console.log(`📊 Parsed ${translations.length} translations (expected: ${expectedCount})`);
+    console.log(`📊 Final result: ${translations.length} translations (expected: ${expectedCount})`);
+    
+    // Log each translation for debugging
+    translations.forEach((translation, index) => {
+      console.log(`🔤 Translation [${index}]: "${translation.substring(0, 50)}${translation.length > 50 ? '...' : ''}"`);
+    });
     
     // If we still don't have enough translations, pad with empty strings
     while (translations.length < expectedCount) {
+      console.warn(`⚠️ Adding empty string for missing translation ${translations.length + 1}`);
       translations.push('');
     }
     

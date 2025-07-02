@@ -42,8 +42,15 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
   React.useEffect(() => {
     if (selectedFile) {
       selectedFile.text().then(content => {
+        console.log('📁 Analyzing file:', selectedFile.name);
         const parsedLines = AssParser.parseAssFile(content);
         const dialogues = parsedLines.filter(line => line.type === 'dialogue' && line.text && line.text.trim());
+        
+        console.log('📊 File analysis results:');
+        console.log(`  Total lines: ${parsedLines.length}`);
+        console.log(`  Dialogue lines: ${dialogues.length}`);
+        console.log(`  First few dialogues:`, dialogues.slice(0, 3).map(d => d.text?.substring(0, 30) + '...'));
+        
         updateState({
           dialogueCount: dialogues.length
         });
@@ -103,11 +110,14 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
       // Get unique texts for translation
       const uniqueDialogueTexts = Array.from(new Set(dialogueLines.map(line => line.text!)));
       
+      console.log(`🔤 Unique texts analysis:`);
+      console.log(`  Total dialogue lines: ${dialogueLines.length}`);
+      console.log(`  Unique texts: ${uniqueDialogueTexts.length}`);
+      console.log(`  Duplicate ratio: ${((dialogueLines.length - uniqueDialogueTexts.length) / dialogueLines.length * 100).toFixed(1)}%`);
+      
       if (uniqueDialogueTexts.length === 0) {
         throw new Error('هیچ متن قابل ترجمه‌ای در فایل یافت نشد');
       }
-
-      console.log(`🔤 Found ${uniqueDialogueTexts.length} unique texts to translate`);
 
       toast({
         title: "شروع ترجمه",
@@ -150,6 +160,18 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
       );
 
       console.log('✨ Translation completed, processing results...');
+      console.log(`🔍 Translation results analysis:`);
+      console.log(`  Input texts: ${uniqueDialogueTexts.length}`);
+      console.log(`  Translated texts: ${translations.size}`);
+      console.log(`  Success rate: ${(translations.size / uniqueDialogueTexts.length * 100).toFixed(1)}%`);
+      
+      // Log some examples
+      const translationEntries = Array.from(translations.entries()).slice(0, 3);
+      console.log('📝 Translation examples:', translationEntries.map(([orig, trans]) => ({
+        original: orig.substring(0, 30) + '...',
+        translated: trans.substring(0, 30) + '...'
+      })));
+      
       console.log('🔧 Reconstructing ASS file...');
       const translatedAssContent = AssParser.reconstructAssFile(parsedLines, translations);
 

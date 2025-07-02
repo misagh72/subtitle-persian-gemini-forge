@@ -1,4 +1,3 @@
-
 export interface AssLine {
   type: 'dialogue' | 'style' | 'info' | 'other';
   content: string;
@@ -18,21 +17,36 @@ export class AssParser {
     const lines = content.split('\n');
     const parsedLines: AssLine[] = [];
 
-    for (const line of lines) {
+    console.log(`🔍 Parsing ASS file with ${lines.length} total lines`);
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
       const trimmedLine = line.trim();
       
       if (trimmedLine.startsWith('Dialogue:')) {
         const dialoguePart = this.extractDialogueText(trimmedLine);
-        const inlineTags = this.extractInlineTagsWithPositions(dialoguePart);
-        const cleanText = this.removeInlineTags(dialoguePart);
         
-        parsedLines.push({
-          type: 'dialogue',
-          content: trimmedLine,
-          text: cleanText,
-          inlineTags,
-          originalLine: line
-        });
+        // More thorough check for valid dialogue
+        if (dialoguePart && dialoguePart.trim().length > 0) {
+          const inlineTags = this.extractInlineTagsWithPositions(dialoguePart);
+          const cleanText = this.removeInlineTags(dialoguePart);
+          
+          // Only include if there's actual text content
+          if (cleanText && cleanText.trim().length > 0) {
+            console.log(`📝 Found dialogue line ${i + 1}: "${cleanText.substring(0, 50)}${cleanText.length > 50 ? '...' : ''}"`);
+            parsedLines.push({
+              type: 'dialogue',
+              content: trimmedLine,
+              text: cleanText.trim(),
+              inlineTags,
+              originalLine: line
+            });
+          } else {
+            console.log(`⚠️ Skipping empty dialogue line ${i + 1}: "${dialoguePart}"`);
+          }
+        } else {
+          console.log(`⚠️ Skipping invalid dialogue line ${i + 1}: "${trimmedLine}"`);
+        }
       } else if (trimmedLine.startsWith('Style:')) {
         parsedLines.push({
           type: 'style',
@@ -54,6 +68,9 @@ export class AssParser {
       }
     }
 
+    const dialogueCount = parsedLines.filter(line => line.type === 'dialogue').length;
+    console.log(`✅ Successfully parsed ${dialogueCount} dialogue lines out of ${lines.length} total lines`);
+
     return parsedLines;
   }
 
@@ -61,7 +78,7 @@ export class AssParser {
     // Extract text part from dialogue line (after the 9th comma)
     const parts = dialogueLine.split(',');
     if (parts.length >= 10) {
-      return parts.slice(9).join(',');
+      return parts.slice(9).join(',').trim();
     }
     return '';
   }
@@ -158,13 +175,20 @@ export class AssParser {
 
   static reconstructAssFile(parsedLines: AssLine[], translations: Map<string, string>): string {
     console.log('🔄 Reconstructing ASS file with', translations.size, 'translations');
+    console.log('📊 Available translations:', Array.from(translations.keys()).slice(0, 5));
     
-    return parsedLines.map(line => {
+    return parsedLines.map((line, index) => {
       if (line.type === 'dialogue' && line.text && translations.has(line.text)) {
         const translatedText = translations.get(line.text)!;
-        console.log('📝 Reconstructing line:', { original: line.text, translated: translatedText, tags: line.inlineTags });
+        console.log(`📝 Reconstructing line ${index + 1}:`, { 
+          original: line.text.substring(0, 30) + '...', 
+          translated: translatedText.substring(0, 30) + '...', 
+          tags: line.inlineTags?.length || 0 
+        });
         
         return this.reconstructDialogue(line.originalLine, translatedText, line.inlineTags || []);
+      } else if (line.type === 'dialogue' && line.text) {
+        console.log(`⚠️ No translation found for line ${index + 1}: "${line.text.substring(0, 30)}..."`);
       }
       return line.originalLine;
     }).join('\n');
