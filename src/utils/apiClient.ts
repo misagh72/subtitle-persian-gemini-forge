@@ -96,8 +96,19 @@ export class TranslationApiClient {
     }
 
     const data = await response.json();
+    console.log('🔍 API Response data:', JSON.stringify(data, null, 2));
+    
+    // Check if response was truncated due to token limits
+    if (data.candidates?.[0]?.finishReason === 'MAX_TOKENS') {
+      throw new ApiError({
+        code: 'MAX_TOKENS',
+        message: 'پاسخ API به دلیل محدودیت طول قطع شد - لطفا تعداد کمتری متن ارسال کنید',
+        retryable: true
+      });
+    }
     
     if (!data.candidates?.[0]?.content?.parts?.[0]?.text) {
+      console.error('❌ Invalid response structure:', data);
       throw new ApiError({
         code: 'INVALID_RESPONSE',
         message: 'فرمت پاسخ نامعتبر از API',
