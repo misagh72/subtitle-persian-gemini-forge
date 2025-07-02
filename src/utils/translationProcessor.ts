@@ -1,4 +1,3 @@
-
 import { TranslationMemory } from '@/utils/translationMemory';
 import { TranslationQualityService } from '@/utils/translationQuality';
 import { TranslationChunk, ProcessingMetrics, AdvancedTranslationSettings, QualityScore } from '@/types/translation';
@@ -99,7 +98,7 @@ export class TranslationProcessor {
   ): Promise<Map<string, string>> {
     const prompt = this.createPrompt(texts, settings);
     const response = await TranslationApiClient.makeRequest(prompt, settings, signal);
-    const parsedTranslations = this.parseResponse(response);
+    const parsedTranslations = this.parseResponse(response, texts.length);
     
     const results = new Map<string, string>();
     
@@ -128,20 +127,59 @@ export class TranslationProcessor {
     return TranslationQualityService.createEnhancedPrompt(texts, settings.qualitySettings);
   }
 
-  private static parseResponse(response: string): string[] {
-    const lines = response.trim().split('\n');
-    const translations: string[] = [];
+  private static parseResponse(response: string, expectedCount: number): string[] {
+    console.log('🔍 Parsing response:', response.substring(0, 200) + '...');
     
-    for (const line of lines) {
-      const match = line.match(/^\d+\.\s*(.+)$/);
-      if (match) {
-        translations.push(match[1].trim());
+    // Split by separator used in prompt (---)
+    let translations = response.split('\n---\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
+    
+    // If separator method doesn't work, try line-by-line
+    if (translations.length !== expectedCount) {
+      console.log('⚠️ Separator parsing failed, trying line-by-line');
+      translations = response.split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+        .map(line => {
+          // Remove any leading numbers or bullets
+          return line
+            .replace(/^\d+\.\s*/, '')
+            .replace(/^[۰-۹]+\.\s*/, '')
+            .replace(/^[-•*]\s*/, '')
+            .trim();
+        })
+        .filter(line => line.length > 0);
+    }
+    
+    // If still doesn't match, try numbered parsing as fallback
+    if (translations.length !== expectedCount) {
+      console.log('⚠️ Line parsing failed, trying numbered parsing');
+      const numberedTranslations: string[] = [];
+      const lines = response.trim().split('\n');
+      
+      for (const line of lines) {
+        const match = line.match(/^\d+\.\s*(.+)$/) || line.match(/^[۰-۹]+\.\s*(.+)$/);
+        if (match) {
+          numberedTranslations.push(match[1].trim());
+        }
+      }
+      
+      if (numberedTranslations.length > 0) {
+        translations = numberedTranslations;
       }
     }
     
-    if (translations.length === 0) {
-      console.warn('⚠️ No numbered translations found, using fallback parsing');
-      return response.split('\n').filter(line => line.trim());
+    // Final cleanup and validation
+    translations = translations
+      .slice(0, expectedCount)
+      .map(text => TranslationQualityService.cleanText(text));
+    
+    console.log(`📊 Parsed ${translations.length} translations (expected: ${expectedCount})`);
+    
+    // If we still don't have enough translations, pad with empty strings
+    while (translations.length < expectedCount) {
+      translations.push('');
     }
     
     return translations;

@@ -1,4 +1,3 @@
-
 export interface TranslationQualitySettings {
   genre: 'movie' | 'series' | 'documentary' | 'animation' | 'comedy' | 'drama' | 'action';
   formalityLevel: 'formal' | 'informal' | 'neutral';
@@ -20,45 +19,36 @@ export class TranslationQualityService {
     const genreContext = this.getGenreContext(settings.genre);
     const formalityInstructions = this.getFormalityInstructions(settings.formalityLevel);
 
-    const textList = texts.map((text, index) => `${index + 1}. ${text}`).join('\n');
+    const textList = texts.map(text => `${text}`).join('\n---\n');
 
-    return `سلام! تو یه مترجم زیرنویس حرفه‌ای هستی و کارت اینه که زیرنویس‌های انگلیسی رو به فارسی طبیعی و روان ترجمه کنی.
+    return `سلام رفیق! 😊
 
-**چی باید بدونی:**
-- نوع فیلم/سریال: ${genreContext}
-- سبک زبان: ${formalityInstructions}
+می‌خوام کمکم کنی این زیرنویس‌ها رو به فارسی ترجمه کنم. فقط یه چیزی مهمه - باید طبیعی و خودمونی بشه، نه مثل کتاب درسی!
 
-**راز ترجمه عالی:**
-هر کلمه انگلیسی باید معادل فارسی داشته باشه! هیچ چیز نباید انگلیسی باقی بمونه.
+**درباره فیلم/سریال:**
+- نوع محتوا: ${genreContext}
+- سبک گفتگو: ${formalityInstructions}
 
-**مثال‌های عملی:**
-- "Hey John, how's it going?" → "سلام جان، چطوری؟"
-- "Let's grab some coffee at Starbucks" → "بیا بریم استارباکس قهوه بخوریم"
-- "I work at Google as a software engineer" → "تو گوگل کار می‌کنم، مهندس نرم‌افزارم"
-- "Can you download the app?" → "می‌تونی اپ رو دانلود کنی؟"
+**نکته مهم:** 
+همه چی رو به فارسی ترجمه کن! حتی اسم‌ها و برندها. مثل:
+- John → جان، Mike → مایک  
+- Google → گوگل، Facebook → فیسبوک
+- New York → نیویورک، London → لندن
 
-**اسم‌ها رو چطور ترجمه کنم:**
-- اسم آدم‌ها: John → جان، Mary → مری، Mike → مایک
-- اسم مکان‌ها: New York → نیویورک، Paris → پاریس
-- برندها: Apple → اپل، Microsoft → مایکروسافت
-- کلمات تخصصی: software → نرم‌افزار، internet → اینترنت
+**مثال‌هایی از ترجمه خوب:**
+"Hey dude, what's up?" → "سلام داداش، چه خبر؟"
+"Let's grab coffee at Starbucks" → "بیا بریم استارباکس قهوه بخوریم"
+"I'm working at Microsoft" → "تو مایکروسافت کار می‌کنم"
 
-**قوانین مهم زیرنویس:**
-✅ حداکثر 42 حرف در هر خط
-✅ حداکثر 2 خط
-✅ باید تو 3-4 ثانیه خونده بشه
-✅ طبیعی و روان باشه
-
-**توجه کن:**
-- اگه جمله طولانیه، شکستش کن
-- از کلمات کوتاه‌تر استفاده کن
-- احساس جمله رو حفظ کن
-- زبان روزمره استفاده کن
+**قوانین زیرنویس:**
+- حداکثر ۴۲ حرف هر خط
+- حداکثر ۲ خط
+- باید سریع خونده بشه
 
 **متن‌هایی که باید ترجمه کنی:**
 ${textList}
 
-**مهم:** فقط ترجمه‌های فارسی رو به همین ترتیب بنویس، هیچ توضیح اضافی نده!`;
+**خیلی مهم:** فقط ترجمه‌های فارسی رو بنویس، هر خط ترجمه رو با خط جدید جدا کن. هیچ شماره یا توضیح اضافی نده!`;
   }
 
   private static getGenreContext(genre: string): string {
@@ -86,6 +76,8 @@ ${textList}
   static cleanText(text: string): string {
     return text
       .trim()
+      .replace(/^\d+\.\s*/, '') // Remove leading numbers like "1. "
+      .replace(/^[۰-۹]+\.\s*/, '') // Remove Persian numbers too
       .replace(/\s+/g, ' ')
       .replace(/ي/g, 'ی')
       .replace(/ك/g, 'ک')
@@ -104,6 +96,12 @@ ${textList}
     if (englishWords && englishWords.length > 0) {
       issues.push(`کلمات انگلیسی ترجمه نشده: ${englishWords.join(', ')}`);
       suggestions.push('همه کلمات انگلیسی باید ترجمه شوند');
+    }
+    
+    // Check for numbers at the beginning
+    if (/^\d+\./.test(translated) || /^[۰-۹]+\./.test(translated)) {
+      issues.push('شماره‌گذاری اضافی در ابتدای ترجمه');
+      suggestions.push('اعداد اضافی را حذف کنید');
     }
     
     // Check length ratio
@@ -153,6 +151,7 @@ ${textList}
     if (lengthRatio > 1.2 || lengthRatio < 0.8) score -= 8;
     if (lines.length > 2) score -= 15;
     if (englishWords && englishWords.length > 0) score -= 25; // Heavy penalty for untranslated words
+    if (/^\d+\./.test(translated) || /^[۰-۹]+\./.test(translated)) score -= 20; // Penalty for numbers
     score = Math.max(0, Math.min(100, score));
 
     return {
@@ -167,6 +166,7 @@ ${textList}
   static generateQualityReport(translations: Map<string, string>, settings: TranslationQualitySettings): string {
     const metrics: QualityMetrics[] = [];
     let totalUntranslatedWords = 0;
+    let totalNumberedTranslations = 0;
     
     translations.forEach((translated, original) => {
       const metric = this.validateTranslation(original, translated);
@@ -176,6 +176,11 @@ ${textList}
       const englishWords = translated.match(/[a-zA-Z]+/g);
       if (englishWords) {
         totalUntranslatedWords += englishWords.length;
+      }
+      
+      // Count numbered translations
+      if (/^\d+\./.test(translated) || /^[۰-۹]+\./.test(translated)) {
+        totalNumberedTranslations++;
       }
     });
 
@@ -189,9 +194,10 @@ ${textList}
 نسبت طول متن: ${avgLengthRatio.toFixed(2)}
 تعداد مسائل: ${totalIssues}
 کلمات ترجمه نشده: ${totalUntranslatedWords}
+ترجمه‌های شماره‌دار: ${totalNumberedTranslations}
 سازگاری فارسی: ${avgConsistency.toFixed(1)}%
 نوع محتوا: ${settings.genre}
 سطح رسمیت: ${settings.formalityLevel}
-وضعیت ترجمه: ${totalUntranslatedWords === 0 ? '✅ کامل' : '❌ ناکامل'}`;
+وضعیت ترجمه: ${totalUntranslatedWords === 0 && totalNumberedTranslations === 0 ? '✅ کامل' : '❌ ناکامل'}`;
   }
 }
