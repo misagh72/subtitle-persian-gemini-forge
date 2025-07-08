@@ -4,8 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Edit, Download, FileText, RotateCcw } from 'lucide-react';
+import { Eye, Edit, Download, FileText, Search, Filter } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface TranslationPreviewProps {
   original: string;
@@ -24,6 +26,8 @@ const TranslationPreview: React.FC<TranslationPreviewProps> = ({
 }) => {
   const [viewMode, setViewMode] = useState<'side-by-side' | 'original' | 'translated'>('side-by-side');
   const [isCompareDialogOpen, setIsCompareDialogOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showAllLines, setShowAllLines] = useState(false);
 
   if (!isVisible || !translated) return null;
 
@@ -51,6 +55,18 @@ const TranslationPreview: React.FC<TranslationPreviewProps> = ({
   const originalLines = original.split('\n').filter(line => line.includes('Dialogue:'));
   const translatedLines = translated.split('\n').filter(line => line.includes('Dialogue:'));
 
+  // Filter lines based on search term
+  const filteredOriginalLines = searchTerm 
+    ? originalLines.filter(line => line.toLowerCase().includes(searchTerm.toLowerCase()))
+    : originalLines;
+  
+  const filteredTranslatedLines = searchTerm 
+    ? translatedLines.filter(line => line.toLowerCase().includes(searchTerm.toLowerCase()))
+    : translatedLines;
+
+  // Determine how many lines to show
+  const linesToShow = showAllLines ? filteredOriginalLines.length : Math.min(10, filteredOriginalLines.length);
+
   return (
     <>
       <Card className="glass-effect hover-glow animate-fade-in">
@@ -71,11 +87,47 @@ const TranslationPreview: React.FC<TranslationPreviewProps> = ({
                     مقایسه
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-6xl max-h-[80vh] overflow-hidden">
+                <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden">
                   <DialogHeader>
-                    <DialogTitle>مقایسه تفصیلی ترجمه</DialogTitle>
+                    <DialogTitle className="flex items-center justify-between">
+                      مقایسه تفصیلی ترجمه
+                      <div className="flex items-center gap-2 text-sm font-normal">
+                        <Badge variant="secondary">{originalLines.length} خط اصلی</Badge>
+                        <Badge variant="secondary">{translatedLines.length} خط ترجمه</Badge>
+                      </div>
+                    </DialogTitle>
                   </DialogHeader>
-                  <div className="flex flex-col h-full">
+                  
+                  <div className="flex flex-col space-y-4">
+                    {/* Search and Controls */}
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1 relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <Input
+                          placeholder="جستجو در متن..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowAllLines(!showAllLines)}
+                      >
+                        {showAllLines ? 'نمایش ۱۰ خط' : 'نمایش همه'}
+                      </Button>
+                      {searchTerm && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSearchTerm('')}
+                        >
+                          پاک کردن
+                        </Button>
+                      )}
+                    </div>
+
                     <Tabs value={viewMode} onValueChange={(value) => setViewMode(value as any)} className="w-full">
                       <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="side-by-side">مقایسه</TabsTrigger>
@@ -84,48 +136,62 @@ const TranslationPreview: React.FC<TranslationPreviewProps> = ({
                       </TabsList>
                       
                       <TabsContent value="side-by-side" className="mt-4">
-                        <div className="grid grid-cols-2 gap-4 max-h-96 overflow-y-auto">
-                          <div>
-                            <h4 className="font-medium mb-2 text-blue-600">متن اصلی</h4>
-                            <div className="space-y-1">
-                              {originalLines.slice(0, 10).map((line, index) => (
-                                <div key={index}>
-                                  {renderSubtitleLine(line, true)}
-                                </div>
-                              ))}
+                        <ScrollArea className="h-[50vh]">
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <h4 className="font-medium mb-2 text-blue-600 sticky top-0 bg-background">
+                                متن اصلی ({filteredOriginalLines.length} خط)
+                              </h4>
+                              <div className="space-y-1">
+                                {filteredOriginalLines.slice(0, linesToShow).map((line, index) => (
+                                  <div key={index}>
+                                    {renderSubtitleLine(line, true)}
+                                  </div>
+                                ))}
+                                {!showAllLines && filteredOriginalLines.length > 10 && (
+                                  <div className="text-center text-muted-foreground text-sm py-2">
+                                    ... و {filteredOriginalLines.length - 10} خط دیگر
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div>
+                              <h4 className="font-medium mb-2 text-green-600 sticky top-0 bg-background">
+                                ترجمه فارسی ({filteredTranslatedLines.length} خط)
+                              </h4>
+                              <div className="space-y-1">
+                                {filteredTranslatedLines.slice(0, linesToShow).map((line, index) => (
+                                  <div key={index}>
+                                    {renderSubtitleLine(line)}
+                                  </div>
+                                ))}
+                                {!showAllLines && filteredTranslatedLines.length > 10 && (
+                                  <div className="text-center text-muted-foreground text-sm py-2">
+                                    ... و {filteredTranslatedLines.length - 10} خط دیگر
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
-                          <div>
-                            <h4 className="font-medium mb-2 text-green-600">ترجمه فارسی</h4>
-                            <div className="space-y-1">
-                              {translatedLines.slice(0, 10).map((line, index) => (
-                                <div key={index}>
-                                  {renderSubtitleLine(line)}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
+                        </ScrollArea>
                       </TabsContent>
                       
                       <TabsContent value="original" className="mt-4">
-                        <div className="max-h-96 overflow-y-auto">
+                        <ScrollArea className="h-[50vh]">
                           <h4 className="font-medium mb-2 text-blue-600">متن اصلی کامل</h4>
                           <pre className="text-xs bg-muted/30 p-4 rounded-lg whitespace-pre-wrap">
-                            {original.slice(0, 2000)}
-                            {original.length > 2000 && '\n... (ادامه دارد)'}
+                            {original}
                           </pre>
-                        </div>
+                        </ScrollArea>
                       </TabsContent>
                       
                       <TabsContent value="translated" className="mt-4">
-                        <div className="max-h-96 overflow-y-auto">
+                        <ScrollArea className="h-[50vh]">
                           <h4 className="font-medium mb-2 text-green-600">ترجمه فارسی کامل</h4>
                           <pre className="text-xs bg-muted/30 p-4 rounded-lg whitespace-pre-wrap">
-                            {translated.slice(0, 2000)}
-                            {translated.length > 2000 && '\n... (ادامه دارد)'}
+                            {translated}
                           </pre>
-                        </div>
+                        </ScrollArea>
                       </TabsContent>
                     </Tabs>
                   </div>

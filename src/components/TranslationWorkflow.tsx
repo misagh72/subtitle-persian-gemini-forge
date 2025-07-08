@@ -38,6 +38,7 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
   qualitySettings,
 }) => {
   const { toast } = useToast();
+  const [originalContent, setOriginalContent] = React.useState<string>('');
 
   React.useEffect(() => {
     if (selectedFile) {
@@ -54,7 +55,10 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
         updateState({
           dialogueCount: dialogues.length
         });
+        setOriginalContent(content);
       }).catch(console.error);
+    } else {
+      setOriginalContent('');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFile]);
@@ -270,7 +274,7 @@ const TranslationWorkflow: React.FC<TranslationWorkflowProps> = ({
       />
       {/* Translation Preview */}
       <TranslationPreview
-        original={selectedFile ? '' : ''}
+        original={originalContent}
         translated={translatedContent}
         isVisible={!!translatedContent && !error}
         onDownload={handleDownload}
