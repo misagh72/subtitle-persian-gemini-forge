@@ -172,7 +172,8 @@ export const useSettingsState = () => {
     formalityLevel: 'informal',
     preserveNames: true,
     contextualTranslation: true,
-    qualityCheck: true
+    qualityCheck: true,
+    useTranslationContext: true
   });
 
   const updateSettings = useCallback((updates: Partial<typeof settings>) => {

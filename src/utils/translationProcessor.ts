@@ -145,7 +145,20 @@ export class TranslationProcessor {
   }
 
   private static createPrompt(texts: string[], settings: AdvancedTranslationSettings): string {
-    return TranslationQualityService.createEnhancedPrompt(texts, settings.qualitySettings);
+    let translationContext = '';
+    
+    if (settings.qualitySettings.useTranslationContext) {
+      // Get recent translations for context
+      const recentMemory = TranslationMemory.getMemory().slice(0, 10);
+      if (recentMemory.length > 0) {
+        translationContext = recentMemory
+          .map(entry => `• "${entry.source}" → "${entry.target}"`)
+          .slice(0, 5) // Limit to 5 examples
+          .join('\n');
+      }
+    }
+    
+    return TranslationQualityService.createEnhancedPrompt(texts, settings.qualitySettings, translationContext);
   }
 
   private static parseResponse(response: string, expectedCount: number): string[] {

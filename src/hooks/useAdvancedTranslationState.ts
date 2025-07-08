@@ -135,7 +135,8 @@ export const useAdvancedSettingsState = () => {
       formalityLevel: 'neutral',
       preserveNames: true,
       contextualTranslation: true,
-      qualityCheck: true
+      qualityCheck: true,
+      useTranslationContext: true
     },
     enablePatternDetection: true,
     enableGrammarCheck: true,
@@ -179,7 +180,8 @@ export const useAdvancedSettingsState = () => {
         formalityLevel: 'neutral',
         preserveNames: true,
         contextualTranslation: true,
-        qualityCheck: true
+        qualityCheck: true,
+        useTranslationContext: true
       },
       enablePatternDetection: true,
       enableGrammarCheck: true,

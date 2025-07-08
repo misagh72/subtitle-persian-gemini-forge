@@ -138,6 +138,25 @@ const QualitySettingsPanel: React.FC<QualitySettingsPanelProps> = ({
             بررسی خودکار کیفیت و گزارش مسائل احتمالی
           </p>
         </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary" />
+              <Label htmlFor="translation-context" className="text-foreground">
+                استفاده از context قبلی
+              </Label>
+            </div>
+            <Switch
+              id="translation-context"
+              checked={qualitySettings.useTranslationContext}
+              onCheckedChange={(checked) => onUpdateQualitySettings({ useTranslationContext: checked })}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            از ترجمه‌های قبلی برای بهبود کیفیت و consistency استفاده کند
+          </p>
+        </div>
       </CardContent>
     </Card>
   );

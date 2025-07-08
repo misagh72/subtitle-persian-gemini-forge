@@ -4,6 +4,7 @@ export interface TranslationQualitySettings {
   preserveNames: boolean;
   contextualTranslation: boolean;
   qualityCheck: boolean;
+  useTranslationContext: boolean;
 }
 
 export interface QualityMetrics {
@@ -15,11 +16,20 @@ export interface QualityMetrics {
 }
 
 export class TranslationQualityService {
-  static createEnhancedPrompt(texts: string[], settings: TranslationQualitySettings): string {
+  static createEnhancedPrompt(texts: string[], settings: TranslationQualitySettings, translationContext?: string): string {
     const genreContext = this.getGenreContext(settings.genre);
     const formalityInstructions = this.getFormalityInstructions(settings.formalityLevel);
 
     const textList = texts.map(text => `${text}`).join('\n---\n');
+    
+    const translationContextSection = settings.useTranslationContext && translationContext
+      ? `
+📚 **Context از ترجمه‌های قبلی:**
+${translationContext}
+
+**مهم:** از این context برای حفظ consistency در نام‌ها، اصطلاحات و سبک ترجمه استفاده کن.
+`
+      : '';
 
     return `سلام رفیق! 😊
 
@@ -40,6 +50,7 @@ export class TranslationQualityService {
 "Let's grab coffee at Starbucks" → "بیا بریم استارباکس قهوه بخوریم"
 "I'm working at Microsoft" → "تو مایکروسافت کار می‌کنم"
 
+${translationContextSection}
 **قوانین زیرنویس:**
 - حداکثر ۴۲ حرف هر خط
 - حداکثر ۲ خط
