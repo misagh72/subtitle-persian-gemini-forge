@@ -5,6 +5,9 @@ export interface TranslationQualitySettings {
   contextualTranslation: boolean;
   qualityCheck: boolean;
   useTranslationContext: boolean;
+  fullContextMode?: boolean;
+  maxContextTokens?: number;
+  maxContextExamples?: number;
 }
 
 export interface QualityMetrics {

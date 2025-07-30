@@ -173,7 +173,10 @@ export const useSettingsState = () => {
     preserveNames: true,
     contextualTranslation: true,
     qualityCheck: true,
-    useTranslationContext: true
+    useTranslationContext: true,
+    fullContextMode: false,
+    maxContextTokens: 8000,
+    maxContextExamples: 15
   });
 
   const updateSettings = useCallback((updates: Partial<typeof settings>) => {

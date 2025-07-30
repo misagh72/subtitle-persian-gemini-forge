@@ -6,15 +6,18 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Sparkles, FileCheck, Shield } from 'lucide-react';
 import { TranslationQualitySettings } from '@/utils/translationQuality';
+import ContextStatsPanel from './ContextStatsPanel';
 
 interface QualitySettingsPanelProps {
   qualitySettings: TranslationQualitySettings;
   onUpdateQualitySettings: (settings: Partial<TranslationQualitySettings>) => void;
+  showContextStats?: boolean;
 }
 
 const QualitySettingsPanel: React.FC<QualitySettingsPanelProps> = ({
   qualitySettings,
   onUpdateQualitySettings,
+  showContextStats = false,
 }) => {
   const genreOptions = [
     { value: 'movie', label: 'فیلم سینمایی' },
@@ -33,6 +36,7 @@ const QualitySettingsPanel: React.FC<QualitySettingsPanelProps> = ({
   ];
 
   return (
+    <>
     <Card className="glass-effect hover-glow animate-fade-in">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-foreground">
@@ -157,8 +161,45 @@ const QualitySettingsPanel: React.FC<QualitySettingsPanelProps> = ({
             از ترجمه‌های قبلی برای بهبود کیفیت و consistency استفاده کند
           </p>
         </div>
+
+        {qualitySettings.useTranslationContext && (
+          <div className="space-y-3 pl-6 border-l-2 border-primary/20">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-primary" />
+                <Label htmlFor="full-context" className="text-foreground">
+                  Full Context Mode
+                </Label>
+              </div>
+              <Switch
+                id="full-context"
+                checked={qualitySettings.fullContextMode || false}
+                onCheckedChange={(checked) => onUpdateQualitySettings({ fullContextMode: checked })}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {qualitySettings.fullContextMode 
+                ? "🔥 استفاده از همه context (token usage بالا، مدل‌های 128k+ فقط)" 
+                : "⚡ استفاده از محدود context (سریع‌تر، token usage کم)"}
+            </p>
+            
+            {qualitySettings.fullContextMode && (
+              <div className="text-xs text-orange-500 bg-orange-50 dark:bg-orange-950/20 p-2 rounded">
+                ⚠️ برای مدل‌های با context window بزرگ (128k+ tokens) مناسب است
+              </div>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
+    
+    {/* Context Statistics Panel */}
+    <ContextStatsPanel 
+      isVisible={showContextStats && qualitySettings.useTranslationContext}
+      fullContextMode={qualitySettings.fullContextMode || false}
+      maxContextTokens={qualitySettings.maxContextTokens || 8000}
+    />
+    </>
   );
 };
 

@@ -2,6 +2,7 @@ import { TranslationMemory } from '@/utils/translationMemory';
 import { TranslationQualityService } from '@/utils/translationQuality';
 import { TranslationChunk, ProcessingMetrics, AdvancedTranslationSettings, QualityScore } from '@/types/translation';
 import { TranslationApiClient } from './apiClient';
+import { TranslationContext } from './translationContext';
 
 export class TranslationProcessor {
   private static readonly MAX_CHUNK_SIZE = 10;
@@ -94,6 +95,9 @@ export class TranslationProcessor {
       });
     }
 
+    // Add chunk results to translation context
+    TranslationContext.addChunkTranslations(chunk, results);
+
     console.log(`✅ Chunk ${chunk.chunkIndex + 1} completed: ${results.size} translations`);
     return results;
   }
@@ -148,14 +152,17 @@ export class TranslationProcessor {
     let translationContext = '';
     
     if (settings.qualitySettings.useTranslationContext) {
-      // Get recent translations for context
-      const recentMemory = TranslationMemory.getMemory().slice(0, 10);
-      if (recentMemory.length > 0) {
-        translationContext = recentMemory
-          .map(entry => `• "${entry.source}" → "${entry.target}"`)
-          .slice(0, 5) // Limit to 5 examples
-          .join('\n');
-      }
+      const contextOptions = {
+        mode: settings.qualitySettings.fullContextMode ? 'full' as const : 'limited' as const,
+        maxTokens: settings.qualitySettings.maxContextTokens || 8000,
+        maxExamples: settings.qualitySettings.maxContextExamples || 15,
+        similarityThreshold: 0.3
+      };
+      
+      translationContext = TranslationContext.buildContext(texts, contextOptions);
+      
+      const tokenEstimate = TranslationContext.getTokenEstimate(translationContext, '');
+      console.log(`📊 Context stats: ${tokenEstimate.context} tokens, mode: ${contextOptions.mode}`);
     }
     
     return TranslationQualityService.createEnhancedPrompt(texts, settings.qualitySettings, translationContext);

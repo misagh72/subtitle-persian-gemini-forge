@@ -99,6 +99,7 @@ const MinimalSettings: React.FC<MinimalSettingsProps> = ({
           <QualitySettingsPanel
             qualitySettings={qualitySettings}
             onUpdateQualitySettings={updateQualitySettings}
+            showContextStats={true}
           />
         </CardContent>
       </Card>

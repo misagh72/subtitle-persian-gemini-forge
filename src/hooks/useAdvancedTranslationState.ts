@@ -136,7 +136,10 @@ export const useAdvancedSettingsState = () => {
       preserveNames: true,
       contextualTranslation: true,
       qualityCheck: true,
-      useTranslationContext: true
+      useTranslationContext: true,
+      fullContextMode: false,
+      maxContextTokens: 8000,
+      maxContextExamples: 15
     },
     enablePatternDetection: true,
     enableGrammarCheck: true,
